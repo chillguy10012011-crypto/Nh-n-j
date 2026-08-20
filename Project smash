@@ -1,0 +1,244 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Tạo ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TeleportGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Khung chính
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 410)
+mainFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -30, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.Text = "Target Teleport Pro"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 14
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+-- Nút Tắt GUI (X)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -30, 0, 0)
+closeBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.Parent = mainFrame
+
+-- Danh sách người chơi
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(0.9, 0, 0.42, 0)
+scrollFrame.Position = UDim2.new(0.05, 0, 0.09, 0)
+scrollFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.Parent = mainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = scrollFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 2)
+
+-- Nút tạo nhanh UI
+local function createButton(text, yPos)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.9, 0, 0.1, 0)
+	btn.Position = UDim2.new(0.05, 0, yPos, 0)
+	btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 12
+	btn.Parent = mainFrame
+	return btn
+end
+
+local toggleBtn = createButton("Dịch chuyển: TẮT", 0.54)
+local lookBtn = createButton("Nhìn gần nhất: TẮT", 0.66)
+local hideBtn = createButton("Tàng hình (Client): TẮT", 0.78)
+
+-- Nút Mở lại GUI
+local openGuiBtn = Instance.new("TextButton")
+openGuiBtn.Size = UDim2.new(0, 50, 0, 50)
+openGuiBtn.Position = UDim2.new(0, 10, 0, 10)
+openGuiBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+openGuiBtn.Text = "GUI"
+openGuiBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+openGuiBtn.Font = Enum.Font.SourceSansBold
+openGuiBtn.Visible = false
+openGuiBtn.Parent = screenGui
+
+-- Biến lưu trạng thái
+local selectedPlayer = nil
+local isFollowing = false
+local isLooking = false
+local isHiding = false
+local followConnection = nil
+local lookConnection = nil
+
+-- Tự động cập nhật chiều cao vùng cuộn
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end)
+
+-- Cập nhật danh sách người chơi
+local function updatePlayerList()
+	for _, child in ipairs(scrollFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, 0, 0, 25)
+			btn.Text = player.DisplayName .. " (@" .. player.Name .. ")"
+			btn.Font = Enum.Font.SourceSans
+			btn.TextSize = 12
+			
+			if selectedPlayer == player then
+				btn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+				btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			else
+				btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+				btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+			end
+			
+			btn.MouseButton1Click:Connect(function()
+				selectedPlayer = player
+				updatePlayerList()
+			end)
+			
+			btn.Parent = scrollFrame
+		end
+	end
+end
+
+-- Tìm người chơi gần nhất
+local function getNearestPlayer()
+	local myChar = LocalPlayer.Character
+	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+	
+	local myHRP = myChar.HumanoidRootPart
+	local nearestPlayer = nil
+	local shortestDistance = math.huge
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local hum = player.Character:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				local targetHRP = player.Character.HumanoidRootPart
+				local distance = (myHRP.Position - targetHRP.Position).Magnitude
+				
+				if distance < shortestDistance then
+					shortestDistance = distance
+					nearestPlayer = player
+				end
+			end
+		end
+	end
+	
+	return nearestPlayer
+end
+
+-- Logic Ẩn/Hiện Bảng GUI
+closeBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = false
+	openGuiBtn.Visible = true
+end)
+
+openGuiBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = true
+	openGuiBtn.Visible = false
+end)
+
+-- Logic Dịch Chuyển
+toggleBtn.MouseButton1Click:Connect(function()
+	isFollowing = not isFollowing
+	toggleBtn.BackgroundColor3 = isFollowing and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+	toggleBtn.Text = isFollowing and "Dịch chuyển: BẬT" or "Dịch chuyển: TẮT"
+	
+	if isFollowing then
+		followConnection = RunService.RenderStepped:Connect(function()
+			if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+				local myChar = LocalPlayer.Character
+				if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+					myChar.HumanoidRootPart.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+				end
+			end
+		end)
+	else
+		if followConnection then
+			followConnection:Disconnect()
+			followConnection = nil
+		end
+	end
+end)
+
+-- Logic Nhìn Người Gần Nhất
+lookBtn.MouseButton1Click:Connect(function()
+	isLooking = not isLooking
+	lookBtn.BackgroundColor3 = isLooking and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+	lookBtn.Text = isLooking and "Nhìn gần nhất: BẬT" or "Nhìn gần nhất: TẮT"
+	
+	if isLooking then
+		lookConnection = RunService.RenderStepped:Connect(function()
+			local nearest = getNearestPlayer()
+			if nearest and nearest.Character and nearest.Character:FindFirstChild("HumanoidRootPart") then
+				local targetPos = nearest.Character.HumanoidRootPart.Position
+				Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+			end
+		end)
+	else
+		if lookConnection then
+			lookConnection:Disconnect()
+			lookConnection = nil
+		end
+	end
+end)
+
+-- Logic Tàng Hình (Client Only)
+hideBtn.MouseButton1Click:Connect(function()
+	isHiding = not isHiding
+	hideBtn.BackgroundColor3 = isHiding and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+	hideBtn.Text = isHiding and "Tàng hình (Client): BẬT" or "Tàng hình (Client): TẮT"
+	
+	local myChar = LocalPlayer.Character
+	if myChar then
+		for _, part in ipairs(myChar:GetDescendants()) do
+			if part:IsA("BasePart") or part:IsA("Decal") then
+				part.Transparency = isHiding and 1 or 0
+			elseif part:IsA("BillboardGui") then
+				part.Enabled = not isHiding
+			end
+		end
+	end
+end)
+
+-- Lắng nghe người chơi ra vào server
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(function(player)
+	if selectedPlayer == player then
+		selectedPlayer = nil
+	end
+	updatePlayerList()
+end)
+
+-- Khởi chạy danh sách ban đầu
+updatePlayerList()
