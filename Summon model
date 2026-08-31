@@ -1,0 +1,214 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- 1. TẠO SCREEN GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomControlGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- 2. NÚT BẬT / TẮT GUI (Nút tròn nổi góc dưới)
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleButton"
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.85, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(45, 120, 220)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "GUI"
+toggleBtn.Font = Enum.Font.Garamond
+toggleBtn.TextSize = 20
+toggleBtn.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleBtn
+
+-- 3. KHUNG CHÍNH (MAIN FRAME)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 320, 0, 260)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -130)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 10)
+frameCorner.Parent = mainFrame
+
+-- 4. THANH TIÊU ĐỀ (TITLE BAR)
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -50, 1, 0)
+titleText.Position = UDim2.new(0, 15, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "Bảng Điều Khiển"
+titleText.TextColor3 = Color3.fromRGB(240, 240, 240)
+titleText.Font = Enum.Font.Garamond
+titleText.TextSize = 18
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+-- Nút X tắt GUI (Góc trên bên phải)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "✕"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeBtn
+
+-- 5. THANH NHẬP TÊN (TEXTBOX)
+local nameInput = Instance.new("TextBox")
+nameInput.Size = UDim2.new(0.9, 0, 0, 40)
+nameInput.Position = UDim2.new(0.05, 0, 0.22, 0)
+nameInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+nameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameInput.PlaceholderText = "Nhập tên Model tại đây..."
+nameInput.PlaceholderColor3 = Color3.fromRGB(150, 150, 160)
+nameInput.Font = Enum.Font.Garamond
+nameInput.TextSize = 15
+nameInput.ClearTextOnFocus = false
+nameInput.Parent = mainFrame
+
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0, 8)
+inputCorner.Parent = nameInput
+
+-- 6. NÚT CHỨC NĂNG 1: TẠO MODEL
+local btnCreate = Instance.new("TextButton")
+btnCreate.Size = UDim2.new(0.9, 0, 0, 40)
+btnCreate.Position = UDim2.new(0.05, 0, 0.45, 0)
+btnCreate.BackgroundColor3 = Color3.fromRGB(46, 139, 87)
+btnCreate.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnCreate.Text = "Tạo Model"
+btnCreate.Font = Enum.Font.Garamond
+btnCreate.TextSize = 16
+btnCreate.Parent = mainFrame
+
+local btnCreateCorner = Instance.new("UICorner")
+btnCreateCorner.CornerRadius = UDim.new(0, 8)
+btnCreateCorner.Parent = btnCreate
+
+-- 7. NÚT CHỨC NĂNG 2: XOÁ MODEL
+local btnDelete = Instance.new("TextButton")
+btnDelete.Size = UDim2.new(0.9, 0, 0, 40)
+btnDelete.Position = UDim2.new(0.05, 0, 0.68, 0)
+btnDelete.BackgroundColor3 = Color3.fromRGB(178, 34, 34)
+btnDelete.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnDelete.Text = "Xoá Model theo tên"
+btnDelete.Font = Enum.Font.Garamond
+btnDelete.TextSize = 16
+btnDelete.Parent = mainFrame
+
+local btnDeleteCorner = Instance.new("UICorner")
+btnDeleteCorner.CornerRadius = UDim.new(0, 8)
+btnDeleteCorner.Parent = btnDelete
+
+--------------------------------------------------------------------------------
+-- CƠ CHẾ KÉO THẢ GUI (DRAGGABLE)
+--------------------------------------------------------------------------------
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function updateDrag(input)
+	local delta = input.Position - dragStart
+	mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+titleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		updateDrag(input)
+	end
+end)
+
+--------------------------------------------------------------------------------
+-- XỬ LÝ SỰ KIỆN NÚT BẤM
+--------------------------------------------------------------------------------
+
+-- Bật/tắt GUI chính bằng nút tròn
+toggleBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- Nút X đóng GUI hoàn toàn (Destroy)
+closeBtn.MouseButton1Click:Connect(function()
+	screenGui:Destroy()
+end)
+
+-- Nút 1: Tạo Model kèm Part bên trong
+btnCreate.MouseButton1Click:Connect(function()
+	local modelName = nameInput.Text
+	if modelName == "" then
+		modelName = "ModelMoi"
+	end
+
+	local newModel = Instance.new("Model")
+	newModel.Name = modelName
+
+	local newPart = Instance.new("Part")
+	newPart.Name = "MainPart"
+	newPart.Size = Vector3.new(4, 4, 4)
+	newPart.BrickColor = BrickColor.random()
+	
+	-- Đặt Part ngay trước mặt nhân vật
+	local character = player.Character
+	if character and character:FindFirstChild("HumanoidRootPart") then
+		newPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -10)
+	else
+		newPart.Position = Vector3.new(0, 10, 0)
+	end
+	
+	newPart.Parent = newModel
+	newModel.PrimaryPart = newPart
+	newModel.Parent = Workspace
+end)
+
+-- Nút 2: Xoá toàn bộ Model có tên tương ứng trong Workspace
+btnDelete.MouseButton1Click:Connect(function()
+	local targetName = nameInput.Text
+	if targetName == "" then return end
+
+	for _, item in ipairs(Workspace:GetChildren()) do
+		if item:IsA("Model") and item.Name == targetName then
+			item:Destroy()
+		end
+	end
+end)
