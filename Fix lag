@@ -1,0 +1,73 @@
+-- Sử dụng cloneref để bảo mật và tránh bị ghi đè tham chiếu
+local raw_cloneref = cloneref or function(obj) return obj end
+local function getService(serviceName)
+    return raw_cloneref(game:GetService(serviceName))
+end
+
+local Workspace = getService("Workspace")
+local Lighting = getService("Lighting")
+local Players = getService("Players")
+local MaterialService = getService("MaterialService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- 1. Vô hiệu hóa Lighting & Hiệu ứng môi trường
+local function disableLightingEffects()
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 1
+    
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("PostEffect") or child:IsA("Atmosphere") or child:IsA("Sky") or child:IsA("Clouds") then
+            child.Enabled = false
+        end
+    end
+end
+
+-- 2. Xử lý các đối tượng trong game (Textures, Decals, Particles, Texter)
+local function optimizeObject(obj)
+    -- Vô hiệu hóa Text / UI trên Part (BillboardGui, SurfaceGui, TextLabel...)
+    if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+        obj.Text = ""
+        obj.Visible = false
+    elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+        obj.Enabled = false
+    
+    -- Vô hiệu hóa Hiệu ứng hạt & Ánh sáng
+    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+        obj.Enabled = false
+    elseif obj:IsA("Light") then -- PointLight, SpotLight, SurfaceLight
+        obj.Enabled = false
+        
+    -- Vô hiệu hóa Texture / Decal
+    elseif obj:IsA("Decal") or obj:IsA("Texture") then
+        obj.Texture = ""
+        obj.Transparency = 1
+        
+    -- Tối ưu 3D Mesh / Part về dạng SmoothPlastic tối giản
+    elseif obj:IsA("BasePart") and not obj:IsA("MeshPart") then
+        obj.Material = Enum.Material.SmoothPlastic
+        obj.Reflectance = 0
+    elseif obj:IsA("MeshPart") then
+        obj.Material = Enum.Material.SmoothPlastic
+        obj.Reflectance = 0
+        obj.TextureID = ""
+    end
+end
+
+-- 3. Tiến hành quét và tối ưu hóa
+disableLightingEffects()
+
+-- Quét toàn bộ map hiện tại
+for _, obj in ipairs(Workspace:GetDescendants()) do
+    optimizeObject(obj)
+end
+
+-- Tự động xử lý các Object mới xuất hiện sau đó (để tránh lag khi spam skill/load map)
+Workspace.DescendantAdded:Connect(function(obj)
+    task.spawn(function()
+        optimizeObject(obj)
+    end)
+end)
+
+print("Đã kích hoạt tối ưu giảm lag & tắt hiêu ứng thành công!")
