@@ -496,7 +496,7 @@ local LinearBtn = createStyledButton(Slide6, "Nút 2: LinearVelocity Fling (OFF)
 -- Nút 3: Noclip & Teleport Fling
 local NoclipBtn = createStyledButton(Slide6, "Nút 3: Clipped Collision Fling (OFF)", UDim2.new(0, 10, 0, 110), UDim2.new(0, 370, 0, 35))
 
--- Biến lưu trữ đối tượng vật lý cho Nút 2
+-- Biến lưu trữ đối tượng vật lý của Nút 2
 local currentLinearVelocity = nil
 local currentAttachment = nil
 
@@ -523,7 +523,43 @@ LinearBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- LOGIC NÚT 3: Noclip & Collision Reset (Xóa CanCollide và gán Velocity)
+-- Sự kiện Click Nút 3
+NoclipBtn.MouseButton1Click:Connect(function()
+    NoclipFlingToggle = not NoclipFlingToggle
+    NoclipBtn.Text = "Nút 3: Clipped Collision Fling (" .. (NoclipFlingToggle and "ON" or "OFF") .. ")"
+    NoclipBtn.BackgroundColor3 = NoclipFlingToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- Vòng lặp xử lý logic vật lý
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- LOGIC NÚT 1: Spin Bot Fling (Xoay vận tốc góc cực cao)
+    if SpinFlingToggle then
+        hrp.AssemblyAngularVelocity = Vector3.new(0, 999999, 0)
+    end
+
+    -- LOGIC NÚT 2: LinearVelocity Force
+    if LinearFlingToggle then
+        if not currentAttachment or currentAttachment.Parent ~= hrp then
+            if currentAttachment then currentAttachment:Destroy() end
+            currentAttachment = Instance.new("Attachment")
+            currentAttachment.Parent = hrp
+        end
+        if not currentLinearVelocity or currentLinearVelocity.Parent ~= hrp then
+            if currentLinearVelocity then currentLinearVelocity:Destroy() end
+            currentLinearVelocity = Instance.new("LinearVelocity")
+            currentLinearVelocity.Attachment0 = currentAttachment
+            currentLinearVelocity.MaxForce = 999999999
+            currentLinearVelocity.VectorVelocity = Vector3.new(9999, 9999, 9999)
+            currentLinearVelocity.Parent = hrp
+        end
+    end
+
+    -- LOGIC NÚT 3: Noclip & Collision Reset (Xóa CanCollide và gán Velocity)
     if NoclipFlingToggle then
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
