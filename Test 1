@@ -1,0 +1,688 @@
+-- // TỐI ƯU HÀM BẢO MẬT CLONEREF
+local function getService(serviceName)
+    local rawService = game:GetService(serviceName)
+    if cloneref then
+        return cloneref(rawService)
+    end
+    return rawService
+end
+
+-- // KHAI BÁO SERVICES
+local Players = getService("Players")
+local RunService = getService("RunService")
+local UserInputService = getService("UserInputService")
+local Workspace = getService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = getService("CoreGui")
+
+-- // HÀM KÉO THẢ (DRAGGABLE) DÙNG CHUNG
+local function enableDragging(frame, dragHandle)
+    dragHandle = dragHandle or frame
+    local dragging, dragInput, dragStart, startPos
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- // TẠO GUI CHÍNH
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomControlGUI"
+ScreenGui.ResetOnSpawn = false
+
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- // NÚT BẬT/TẮT HÌNH TRÒN (FLOATING BUTTON)
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "ToggleButton"
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ToggleBtn.BorderSizePixel = 2
+ToggleBtn.Text = "GUI"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(1, 0)
+ToggleCorner.Parent = ToggleBtn
+
+enableDragging(ToggleBtn)
+
+-- // KHUNG CHÍNH (MAIN FRAME)
+local baseWidth, baseHeight = 275, 175 -- Kích thước gốc tương ứng với scale = 1 (mặc định scale = 2 => 550x350)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, baseWidth * 2, 0, baseHeight * 2)
+MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+MainFrame.BorderSizePixel = 2
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.BorderColor3 = Color3.fromRGB(0, 170, 255)
+TitleBar.BorderSizePixel = 1
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -40, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "CONTROL PANEL"
+TitleText.TextColor3 = Color3.fromRGB(0, 170, 255)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 16
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+enableDragging(MainFrame, TitleBar)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- // THANH BÊN NÚT SLIDE (CUỘN ĐƯỢC)
+local Sidebar = Instance.new("ScrollingFrame")
+Sidebar.Size = UDim2.new(0, 140, 1, -30)
+Sidebar.Position = UDim2.new(0, 0, 0, 30)
+Sidebar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Sidebar.BorderColor3 = Color3.fromRGB(0, 170, 255)
+Sidebar.BorderSizePixel = 1
+Sidebar.ScrollBarThickness = 4
+Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+Sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Sidebar.Parent = MainFrame
+
+local SidebarLayout = Instance.new("UIListLayout")
+SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SidebarLayout.Padding = UDim.new(0, 2)
+SidebarLayout.Parent = Sidebar
+
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -140, 1, -30)
+ContentArea.Position = UDim2.new(0, 140, 0, 30)
+ContentArea.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ContentArea.BorderSizePixel = 0
+ContentArea.Parent = MainFrame
+
+local slides = {}
+
+-- // KHUNG SLIDE NỘI DUNG (CUỘN ĐƯỢC)
+local function createSlide(name)
+    local slideFrame = Instance.new("ScrollingFrame")
+    slideFrame.Name = name
+    slideFrame.Size = UDim2.new(1, 0, 1, 0)
+    slideFrame.BackgroundTransparency = 1
+    slideFrame.BorderSizePixel = 0
+    slideFrame.ScrollBarThickness = 6
+    slideFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    slideFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    slideFrame.Visible = false
+    slideFrame.Parent = ContentArea
+
+    local navButton = Instance.new("TextButton")
+    navButton.Size = UDim2.new(1, 0, 0, 35)
+    navButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    navButton.BorderColor3 = Color3.fromRGB(0, 170, 255)
+    navButton.BorderSizePixel = 1
+    navButton.Text = name
+    navButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    navButton.Font = Enum.Font.SourceSans
+    navButton.TextSize = 14
+    navButton.Parent = Sidebar
+
+    navButton.MouseButton1Click:Connect(function()
+        for _, s in pairs(slides) do s.Visible = false end
+        slideFrame.Visible = true
+    end)
+
+    slides[name] = slideFrame
+    return slideFrame
+end
+
+local function createStyledButton(parent, text, pos, size)
+    local btn = Instance.new("TextButton")
+    btn.Size = size or UDim2.new(0, 180, 0, 30)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+    btn.BorderSizePixel = 1
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 14
+    btn.Parent = parent
+    return btn
+end
+
+local function createStyledTextBox(parent, placeholder, pos, size)
+    local box = Instance.new("TextBox")
+    box.Size = size or UDim2.new(0, 180, 0, 30)
+    box.Position = pos
+    box.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    box.BorderColor3 = Color3.fromRGB(0, 170, 255)
+    box.BorderSizePixel = 1
+    box.PlaceholderText = placeholder
+    box.Text = ""
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.Font = Enum.Font.SourceSans
+    box.TextSize = 14
+    box.Parent = parent
+    return box
+end
+-- ==========================================
+-- SLIDE 1: Project smash
+-- ==========================================
+local Slide1 = createSlide("Project smash")
+Slide1.Visible = true
+
+local selectedPlayerName = ""
+local modeOption = 1
+local targetDistance = 4
+
+local SelectedLbl = Instance.new("TextLabel")
+SelectedLbl.Size = UDim2.new(0, 230, 0, 25)
+SelectedLbl.Position = UDim2.new(0, 10, 0, 10)
+SelectedLbl.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SelectedLbl.BorderColor3 = Color3.fromRGB(0, 170, 255)
+SelectedLbl.BorderSizePixel = 1
+SelectedLbl.Text = "Người chơi: [Chưa chọn]"
+SelectedLbl.TextColor3 = Color3.fromRGB(0, 255, 150)
+SelectedLbl.Font = Enum.Font.SourceSans
+SelectedLbl.TextSize = 13
+SelectedLbl.Parent = Slide1
+
+local PlayerList = Instance.new("ScrollingFrame")
+PlayerList.Size = UDim2.new(0, 230, 0, 90)
+PlayerList.Position = UDim2.new(0, 10, 0, 40)
+PlayerList.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+PlayerList.BorderColor3 = Color3.fromRGB(0, 170, 255)
+PlayerList.BorderSizePixel = 1
+PlayerList.ScrollBarThickness = 4
+PlayerList.Parent = Slide1
+
+local UIList = Instance.new("UIListLayout")
+UIList.Parent = PlayerList
+
+local function updatePlayerList()
+    for _, child in pairs(PlayerList:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local pBtn = Instance.new("TextButton")
+            pBtn.Size = UDim2.new(1, 0, 0, 25)
+            pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            pBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+            pBtn.BorderSizePixel = 1
+            pBtn.Text = p.Name
+            pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            pBtn.Font = Enum.Font.SourceSans
+            pBtn.TextSize = 13
+            pBtn.Parent = PlayerList
+
+            pBtn.MouseButton1Click:Connect(function()
+                selectedPlayerName = p.Name
+                SelectedLbl.Text = "Người chơi: " .. selectedPlayerName
+            end)
+        end
+    end
+end
+updatePlayerList()
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+
+local InputNameBox1 = createStyledTextBox(Slide1, "Nhập Username...", UDim2.new(0, 10, 0, 135), UDim2.new(0, 230, 0, 28))
+
+local ModeFrame = Instance.new("Frame")
+ModeFrame.Size = UDim2.new(0, 230, 0, 30)
+ModeFrame.Position = UDim2.new(0, 10, 0, 168)
+ModeFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ModeFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ModeFrame.BorderSizePixel = 1
+ModeFrame.Parent = Slide1
+
+local Mode1Btn = createStyledButton(ModeFrame, "Chế độ 1", UDim2.new(0, 2, 0, 2.5), UDim2.new(0, 110, 0, 25))
+local Mode2Btn = createStyledButton(ModeFrame, "Chế độ 2", UDim2.new(0, 115, 0, 2.5), UDim2.new(0, 110, 0, 25))
+Mode1Btn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+
+Mode1Btn.MouseButton1Click:Connect(function()
+    modeOption = 1
+    Mode1Btn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    Mode2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end)
+
+Mode2Btn.MouseButton1Click:Connect(function()
+    modeOption = 2
+    Mode2Btn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    Mode1Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end)
+
+local LockAimToggle = false
+local AimBtn = createStyledButton(Slide1, "Nút 1: Nhìn người gần nhất (OFF)", UDim2.new(0, 10, 0, 203), UDim2.new(0, 230, 0, 28))
+
+local StandBehindToggle = false
+local BehindBtn = createStyledButton(Slide1, "Nút 2: Đứng sau target (OFF)", UDim2.new(0, 10, 0, 236), UDim2.new(0, 230, 0, 28))
+
+AimBtn.MouseButton1Click:Connect(function()
+    LockAimToggle = not LockAimToggle
+    AimBtn.Text = "Nút 1: Nhìn người gần nhất (" .. (LockAimToggle and "ON" or "OFF") .. ")"
+    AimBtn.BackgroundColor3 = LockAimToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+BehindBtn.MouseButton1Click:Connect(function()
+    StandBehindToggle = not StandBehindToggle
+    BehindBtn.Text = "Nút 2: Đứng sau target (" .. (StandBehindToggle and "ON" or "OFF") .. ")"
+    BehindBtn.BackgroundColor3 = StandBehindToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0, 10, 0, 269), UDim2.new(0, 230, 0, 22))
+DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
+DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
+
+local SliderFrame = Instance.new("Frame")
+SliderFrame.Size = UDim2.new(0, 230, 0, 15)
+SliderFrame.Position = UDim2.new(0, 10, 0, 296)
+SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+SliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+SliderFrame.BorderSizePixel = 1
+SliderFrame.Parent = Slide1
+
+local SliderFill = Instance.new("Frame")
+SliderFill.Size = UDim2.new((4 - 1) / (20 - 1), 0, 1, 0)
+SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+SliderFill.BorderSizePixel = 0
+SliderFill.Parent = SliderFrame
+
+local SliderBtn = Instance.new("TextButton")
+SliderBtn.Size = UDim2.new(0, 12, 1, 4)
+SliderBtn.Position = UDim2.new(1, -6, 0, -2)
+SliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SliderBtn.Text = ""
+SliderBtn.Parent = SliderFill
+
+local isDraggingSlider = false
+
+local function updateSliderFromValue(val)
+    val = math.clamp(val, 1, 20)
+    targetDistance = math.floor(val * 10 + 0.5) / 10
+    SliderFill.Size = UDim2.new((targetDistance - 1) / 19, 0, 1, 0)
+    DistBox.Text = "Khoảng cách: " .. tostring(targetDistance) .. " studs (Nhấn để chỉnh)"
+end
+
+local function updateSliderFromInput(input)
+    local relativeX = input.Position.X - SliderFrame.AbsolutePosition.X
+    local pct = math.clamp(relativeX / SliderFrame.AbsoluteSize.X, 0, 1)
+    local val = 1 + (pct * 19)
+    updateSliderFromValue(val)
+end
+
+SliderFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSlider = true
+        updateSliderFromInput(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateSliderFromInput(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSlider = false
+    end
+end)
+
+DistBox.FocusLost:Connect(function()
+    local num = tonumber(DistBox.Text:match("%d+%.?%d*"))
+    if num then
+        updateSliderFromValue(num)
+    else
+        DistBox.Text = "Khoảng cách: " .. tostring(targetDistance) .. " studs (Nhấn để chỉnh)"
+    end
+end)
+
+local function getTargetPlayer()
+    local name = (modeOption == 1) and selectedPlayerName or InputNameBox1.Text
+    if name ~= "" then
+        return Players:FindFirstChild(name)
+    end
+    return nil
+end
+
+RunService.RenderStepped:Connect(function()
+    if LockAimToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myHrp = LocalPlayer.Character.HumanoidRootPart
+        local closestChar = nil
+        local shortestDist = math.huge
+
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (p.Character.HumanoidRootPart.Position - myHrp.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    closestChar = p.Character.HumanoidRootPart
+                end
+            end
+        end
+
+        if closestChar then
+            Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, closestChar.Position)
+        end
+    end
+
+    if StandBehindToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local target = getTargetPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetHrp = target.Character.HumanoidRootPart
+            local myHrp = LocalPlayer.Character.HumanoidRootPart
+            myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, targetDistance)
+        end
+    end
+end)
+
+-- ==========================================
+-- SLIDE 2: Deadrais
+-- ==========================================
+local Slide2 = createSlide(" Deadrais ")
+local PushToggle = false
+local PushBtn = createStyledButton(Slide2, "Nút 1: Đẩy Model gần (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+PushBtn.MouseButton1Click:Connect(function()
+    PushToggle = not PushToggle
+    PushBtn.Text = "Nút 1: Đẩy Model gần (" .. (PushToggle and "ON" or "OFF") .. ")"
+    PushBtn.BackgroundColor3 = PushToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+RunService.Heartbeat:Connect(function()
+    if PushToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myHrp = LocalPlayer.Character.HumanoidRootPart
+        for _, obj in pairs(Workspace:GetChildren()) do
+            if obj:IsA("Model") and obj ~= LocalPlayer.Character then
+                local targetPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("PrimaryPart") or obj:FindFirstChildWhichIsA("BasePart")
+                if targetPart and not Players:GetPlayerFromCharacter(obj) then
+                    local dist = (targetPart.Position - myHrp.Position).Magnitude
+                    if dist <= 10 then
+                        local dir = (targetPart.Position - myHrp.Position).Unit
+                        if dir ~= dir then dir = Vector3.new(1, 0, 0) end
+                        targetPart.CFrame = CFrame.new(myHrp.Position + (dir * 11))
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- SLIDE 3: Fix lag
+-- ==========================================
+local Slide3 = createSlide(" fix lag ")
+local FixLagBtn = createStyledButton(Slide3, "Chạy Code Fix Lag", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+FixLagBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/chillguy10012011-crypto/Nh-n-j/refs/heads/main/Fix%20lag"))()
+    end)
+end)
+
+-- ==========================================
+-- SLIDE 4: Lumber tycoon 2
+-- ==========================================
+local Slide4 = createSlide(" Lumber tycoon 2")
+local LT2Btn = createStyledButton(Slide4, "Chạy Script Kron Hub", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+LT2Btn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/DevKron/Kron_Hub/refs/heads/main/version_1.0'))()
+    end)
+end)
+-- ==========================================
+-- SLIDE 5: Spawn model
+-- ==========================================
+local Slide5 = createSlide(" spawn model ")
+
+local SpawnBox = createStyledTextBox(Slide5, "Nhập tên Model...", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 30))
+
+local SpawnUnanchoredBtn = createStyledButton(Slide5, "Triệu hồi (Có tác động lực)", UDim2.new(0, 10, 0, 60), UDim2.new(0, 230, 0, 30))
+local SpawnAnchoredBtn = createStyledButton(Slide5, "Triệu hồi (Không tác động lực)", UDim2.new(0, 10, 0, 100), UDim2.new(0, 230, 0, 30))
+local DeleteModelBtn = createStyledButton(Slide5, "Xóa toàn bộ Model theo tên", UDim2.new(0, 10, 0, 140), UDim2.new(0, 230, 0, 30))
+
+local function spawnModelLogic(isAnchored)
+    local name = SpawnBox.Text
+    if name == "" then return end
+    
+    local char = LocalPlayer.Character
+    local spawnPos = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5) or CFrame.new(0, 10, 0)
+
+    local newModel = Instance.new("Model")
+    newModel.Name = name
+
+    local part = Instance.new("Part")
+    part.Name = "MainPart"
+    part.Size = Vector3.new(4, 4, 4)
+    part.CFrame = spawnPos
+    part.Anchored = isAnchored
+    part.CanCollide = true
+    part.Material = Enum.Material.SmoothPlastic
+    part.Color = Color3.fromRGB(0, 170, 255)
+    part.Parent = newModel
+
+    newModel.PrimaryPart = part
+    newModel.Parent = Workspace
+end
+
+SpawnUnanchoredBtn.MouseButton1Click:Connect(function()
+    spawnModelLogic(false)
+end)
+
+SpawnAnchoredBtn.MouseButton1Click:Connect(function()
+    spawnModelLogic(true)
+end)
+
+DeleteModelBtn.MouseButton1Click:Connect(function()
+    local name = SpawnBox.Text
+    if name == "" then return end
+    
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj.Name == name then
+            obj:Destroy()
+        end
+    end
+end)
+
+-- ==========================================
+-- SLIDE 6: Dynamic Collision
+-- ==========================================
+local Slide6 = createSlide("Dynamic Collision")
+
+local CollisionToggle = false
+local CollisionBtn = createStyledButton(Slide6, "Auto CanCollide (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+local isTouching = false
+
+local function setupTouchDetection(char)
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Touched:Connect(function(hit)
+                if not CollisionToggle then return end
+                if hit and not hit:IsDescendantOf(char) then
+                    isTouching = true
+                end
+            end)
+
+            part.TouchEnded:Connect(function(hit)
+                if not CollisionToggle then return end
+                if hit and not hit:IsDescendantOf(char) then
+                    isTouching = false
+                end
+            end)
+        end
+    end
+end
+
+CollisionBtn.MouseButton1Click:Connect(function()
+    CollisionToggle = not CollisionToggle
+    CollisionBtn.Text = "Auto CanCollide (" .. (CollisionToggle and "ON" or "OFF") .. ")"
+    CollisionBtn.BackgroundColor3 = CollisionToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+
+    if not CollisionToggle and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end)
+
+if LocalPlayer.Character then
+    setupTouchDetection(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(setupTouchDetection)
+
+RunService.Stepped:Connect(function()
+    if CollisionToggle and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = isTouching
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- SLIDE 7: Infinite yield
+-- ==========================================
+local Slide7 = createSlide("Infinite yield")
+
+local IYBtn = createStyledButton(Slide7, "Chạy Script Infinite Yield", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+IYBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end)
+end)
+
+-- ==========================================
+-- SLIDE 8: Setting (Tùy chỉnh Kích thước GUI)
+-- ==========================================
+local Slide8 = createSlide("Setting")
+
+local currentScale = 2 -- Giá trị mặc định là 2
+
+local ScaleLbl = createStyledTextBox(Slide8, "", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 25))
+ScaleLbl.Text = "Kích thước GUI: 2"
+ScaleLbl.TextColor3 = Color3.fromRGB(0, 170, 255)
+
+local GuiSliderFrame = Instance.new("Frame")
+GuiSliderFrame.Size = UDim2.new(0, 230, 0, 15)
+GuiSliderFrame.Position = UDim2.new(0, 10, 0, 50)
+GuiSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+GuiSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+GuiSliderFrame.BorderSizePixel = 1
+GuiSliderFrame.Parent = Slide8
+
+local GuiSliderFill = Instance.new("Frame")
+GuiSliderFill.Size = UDim2.new((2 - 1) / (4 - 1), 0, 1, 0)
+GuiSliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+GuiSliderFill.BorderSizePixel = 0
+GuiSliderFill.Parent = GuiSliderFrame
+
+local GuiSliderBtn = Instance.new("TextButton")
+GuiSliderBtn.Size = UDim2.new(0, 12, 1, 4)
+GuiSliderBtn.Position = UDim2.new(1, -6, 0, -2)
+GuiSliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+GuiSliderBtn.Text = ""
+GuiSliderBtn.Parent = GuiSliderFill
+
+local isDraggingGuiSlider = false
+
+local function updateGuiScale(val)
+    val = math.clamp(val, 1, 4)
+    currentScale = math.floor(val * 10 + 0.5) / 10
+    GuiSliderFill.Size = UDim2.new((currentScale - 1) / 3, 0, 1, 0)
+    ScaleLbl.Text = "Kích thước GUI: " .. tostring(currentScale)
+    MainFrame.Size = UDim2.new(0, baseWidth * currentScale, 0, baseHeight * currentScale)
+end
+
+local function updateGuiSliderFromInput(input)
+    local relativeX = input.Position.X - GuiSliderFrame.AbsolutePosition.X
+    local pct = math.clamp(relativeX / GuiSliderFrame.AbsoluteSize.X, 0, 1)
+    local val = 1 + (pct * 3)
+    updateGuiScale(val)
+end
+
+GuiSliderFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingGuiSlider = true
+        updateGuiSliderFromInput(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingGuiSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateGuiSliderFromInput(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingGuiSlider = false
+    end
+end)
+
+ScaleLbl.FocusLost:Connect(function()
+    local num = tonumber(ScaleLbl.Text:match("%d+%.?%d*"))
+    if num then
+        updateGuiScale(num)
+    else
+        ScaleLbl.Text = "Kích thước GUI: " .. tostring(currentScale)
+    end
+end)
