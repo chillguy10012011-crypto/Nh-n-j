@@ -478,32 +478,53 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 6: Teleport Head Model
+-- SLIDE 6: Fling
 -- ==========================================
-local Slide6 = createSlide(" Tele Head Model ")
+local Slide6 = createSlide("Fling")
 
-local ModelHeadBox = createStyledTextBox(Slide6, "Nhập tên Model...", UDim2.new(0, 10, 0, 20), UDim2.new(0, 370, 0, 30))
-local TeleHeadToggle = false
-local TeleHeadBtn = createStyledButton(Slide6, "Đứng trên đầu Model (OFF)", UDim2.new(0, 10, 0, 60), UDim2.new(0, 370, 0, 35))
+-- Khai báo trạng thái bật/tắt
+local SpinFlingToggle = false
+local LinearFlingToggle = false
+local NoclipFlingToggle = false
 
-TeleHeadBtn.MouseButton1Click:Connect(function()
-    TeleHeadToggle = not TeleHeadToggle
-    TeleHeadBtn.Text = "Đứng trên đầu Model (" .. (TeleHeadToggle and "ON" or "OFF") .. ")"
-    TeleHeadBtn.BackgroundColor3 = TeleHeadToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-end)
+-- Nút 1: Spin Bot Fling
+local SpinBtn = createStyledButton(Slide6, "Nút 1: Spin Bot Fling (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 370, 0, 35))
 
-RunService.RenderStepped:Connect(function()
-    if TeleHeadToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local targetName = ModelHeadBox.Text
-        if targetName ~= "" then
-            local targetModel = Workspace:FindFirstChild(targetName)
-            if targetModel and targetModel:IsA("Model") then
-                local targetPart = targetModel:FindFirstChild("Head") or targetModel:FindFirstChild("HumanoidRootPart") or targetModel.PrimaryPart or targetModel:FindFirstChildWhichIsA("BasePart")
-                if targetPart then
-                    local myHrp = LocalPlayer.Character.HumanoidRootPart
-                    myHrp.CFrame = targetPart.CFrame * CFrame.new(0, targetPart.Size.Y / 2 + 3, 0)
-                end
-            end
-        end
+-- Nút 2: LinearVelocity Fling
+local LinearBtn = createStyledButton(Slide6, "Nút 2: LinearVelocity Fling (OFF)", UDim2.new(0, 10, 0, 65), UDim2.new(0, 370, 0, 35))
+
+-- Nút 3: Noclip & Teleport Fling
+local NoclipBtn = createStyledButton(Slide6, "Nút 3: Clipped Collision Fling (OFF)", UDim2.new(0, 10, 0, 110), UDim2.new(0, 370, 0, 35))
+
+-- Biến lưu trữ đối tượng vật lý cho Nút 2
+local currentLinearVelocity = nil
+local currentAttachment = nil
+
+-- Sự kiện Click Nút 1
+SpinBtn.MouseButton1Click:Connect(function()
+    SpinFlingToggle = not SpinFlingToggle
+    SpinBtn.Text = "Nút 1: Spin Bot Fling (" .. (SpinFlingToggle and "ON" or "OFF") .. ")"
+    SpinBtn.BackgroundColor3 = SpinFlingToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    
+    if not SpinFlingToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
 end)
+
+-- Sự kiện Click Nút 2
+LinearBtn.MouseButton1Click:Connect(function()
+    LinearFlingToggle = not LinearFlingToggle
+    LinearBtn.Text = "Nút 2: LinearVelocity Fling (" .. (LinearFlingToggle and "ON" or "OFF") .. ")"
+    LinearBtn.BackgroundColor3 = LinearFlingToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+
+    if not LinearFlingToggle then
+        if currentLinearVelocity then currentLinearVelocity:Destroy() currentLinearVelocity = nil end
+        if currentAttachment then currentAttachment:Destroy() currentAttachment = nil end
+    end
+end)
+
+-- Sự kiện Click Nút 3
+NoclipBtn.MouseButton1Click:Connect(function()
+    NoclipFlingToggle = not NoclipFlingToggle
+    NoclipBtn.Text = "Nút 3: Clipped Collision Fling (" .. (NoclipFlingToggle and "ON" or "OFF") .. ")"
+    NoclipBtn.BackgroundC
