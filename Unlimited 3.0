@@ -569,3 +569,15 @@ RunService.Heartbeat:Connect(function()
         hrp.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
     end
 end)
+-- ==========================================
+-- SLIDE 7: Infinite yield
+-- ==========================================
+local Slide7 = createSlide("Infinite yield")
+
+local IYBtn = createStyledButton(Slide7, "Chạy Script Infinite Yield", UDim2.new(0, 10, 0, 20), UDim2.new(0, 370, 0, 35))
+
+IYBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end)
+end)
