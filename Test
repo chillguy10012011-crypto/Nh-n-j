@@ -605,3 +605,16 @@ IYBtn.MouseButton1Click:Connect(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
     end)
 end)
+-- ==========================================
+-- SLIDE 8: FE Invisible
+-- ==========================================
+local Slide8 = createSlide("FE Invisible")
+
+local InvisBtn = createStyledButton(Slide8, "Kích hoạt Tàng Hình FE", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+InvisBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        -- Script FE Invisible phổ biến & ổn định nhất
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostPlayer352/Test4/main/Invisible%20Gui"))()
+    end)
+end)
