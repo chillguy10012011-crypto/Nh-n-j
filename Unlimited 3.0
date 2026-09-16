@@ -523,8 +523,13 @@ LinearBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Sự kiện Click Nút 3
-NoclipBtn.MouseButton1Click:Connect(function()
-    NoclipFlingToggle = not NoclipFlingToggle
-    NoclipBtn.Text = "Nút 3: Clipped Collision Fling (" .. (NoclipFlingToggle and "ON" or "OFF") .. ")"
-    NoclipBtn.BackgroundC
+-- LOGIC NÚT 3: Noclip & Collision Reset (Xóa CanCollide và gán Velocity)
+    if NoclipFlingToggle then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+        hrp.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+    end
+end)
