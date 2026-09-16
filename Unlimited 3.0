@@ -478,97 +478,71 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 6: Fling
+-- SLIDE 6: Dynamic Collision
 -- ==========================================
-local Slide6 = createSlide("Fling")
+local Slide6 = createSlide("Dynamic Collision")
 
--- Khai báo trạng thái bật/tắt
-local SpinFlingToggle = false
-local LinearFlingToggle = false
-local NoclipFlingToggle = false
+local CollisionToggle = false
+local CollisionBtn = createStyledButton(Slide6, "Auto CanCollide (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 370, 0, 35))
 
--- Nút 1: Spin Bot Fling
-local SpinBtn = createStyledButton(Slide6, "Nút 1: Spin Bot Fling (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 370, 0, 35))
+local isTouching = false
 
--- Nút 2: LinearVelocity Fling
-local LinearBtn = createStyledButton(Slide6, "Nút 2: LinearVelocity Fling (OFF)", UDim2.new(0, 10, 0, 65), UDim2.new(0, 370, 0, 35))
+-- Lắng nghe sự kiện va chạm của nhân vật
+local function setupTouchDetection(char)
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Touched:Connect(function(hit)
+                if not CollisionToggle then return end
+                -- Nếu vật thể chạm vào không thuộc về nhân vật của mình
+                if hit and not hit:IsDescendantOf(char) then
+                    isTouching = true
+                end
+            end)
 
--- Nút 3: Noclip & Teleport Fling
-local NoclipBtn = createStyledButton(Slide6, "Nút 3: Clipped Collision Fling (OFF)", UDim2.new(0, 10, 0, 110), UDim2.new(0, 370, 0, 35))
-
--- Biến lưu trữ đối tượng vật lý của Nút 2
-local currentLinearVelocity = nil
-local currentAttachment = nil
-
--- Sự kiện Click Nút 1
-SpinBtn.MouseButton1Click:Connect(function()
-    SpinFlingToggle = not SpinFlingToggle
-    SpinBtn.Text = "Nút 1: Spin Bot Fling (" .. (SpinFlingToggle and "ON" or "OFF") .. ")"
-    SpinBtn.BackgroundColor3 = SpinFlingToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-    
-    if not SpinFlingToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-    end
-end)
-
--- Sự kiện Click Nút 2
-LinearBtn.MouseButton1Click:Connect(function()
-    LinearFlingToggle = not LinearFlingToggle
-    LinearBtn.Text = "Nút 2: LinearVelocity Fling (" .. (LinearFlingToggle and "ON" or "OFF") .. ")"
-    LinearBtn.BackgroundColor3 = LinearFlingToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-
-    if not LinearFlingToggle then
-        if currentLinearVelocity then currentLinearVelocity:Destroy() currentLinearVelocity = nil end
-        if currentAttachment then currentAttachment:Destroy() currentAttachment = nil end
-    end
-end)
-
--- Sự kiện Click Nút 3
-NoclipBtn.MouseButton1Click:Connect(function()
-    NoclipFlingToggle = not NoclipFlingToggle
-    NoclipBtn.Text = "Nút 3: Clipped Collision Fling (" .. (NoclipFlingToggle and "ON" or "OFF") .. ")"
-    NoclipBtn.BackgroundColor3 = NoclipFlingToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-end)
-
--- Vòng lặp xử lý logic vật lý
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    -- LOGIC NÚT 1: Spin Bot Fling (Xoay vận tốc góc cực cao)
-    if SpinFlingToggle then
-        hrp.AssemblyAngularVelocity = Vector3.new(0, 999999, 0)
-    end
-
-    -- LOGIC NÚT 2: LinearVelocity Force
-    if LinearFlingToggle then
-        if not currentAttachment or currentAttachment.Parent ~= hrp then
-            if currentAttachment then currentAttachment:Destroy() end
-            currentAttachment = Instance.new("Attachment")
-            currentAttachment.Parent = hrp
-        end
-        if not currentLinearVelocity or currentLinearVelocity.Parent ~= hrp then
-            if currentLinearVelocity then currentLinearVelocity:Destroy() end
-            currentLinearVelocity = Instance.new("LinearVelocity")
-            currentLinearVelocity.Attachment0 = currentAttachment
-            currentLinearVelocity.MaxForce = 999999999
-            currentLinearVelocity.VectorVelocity = Vector3.new(9999, 9999, 9999)
-            currentLinearVelocity.Parent = hrp
+            part.TouchEnded:Connect(function(hit)
+                if not CollisionToggle then return end
+                if hit and not hit:IsDescendantOf(char) then
+                    isTouching = false
+                end
+            end)
         end
     end
+end
 
-    -- LOGIC NÚT 3: Noclip & Collision Reset (Xóa CanCollide và gán Velocity)
-    if NoclipFlingToggle then
-        for _, part in pairs(char:GetDescendants()) do
+-- Bật / Tắt chức năng
+CollisionBtn.MouseButton1Click:Connect(function()
+    CollisionToggle = not CollisionToggle
+    CollisionBtn.Text = "Auto CanCollide (" .. (CollisionToggle and "ON" or "OFF") .. ")"
+    CollisionBtn.BackgroundColor3 = CollisionToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+
+    -- Khi tắt, khôi phục CanCollide = true cho nhân vật
+    if not CollisionToggle and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then
-                part.CanCollide = false
+                part.CanCollide = true
             end
         end
-        hrp.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
     end
 end)
+
+-- Khởi tạo sự kiện khi nhân vật respawn
+if LocalPlayer.Character then
+    setupTouchDetection(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(setupTouchDetection)
+
+-- Vòng lặp cập nhật trạng thái CanCollide liên tục
+RunService.Stepped:Connect(function()
+    if CollisionToggle and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                -- Nếu có ai chạm vào thì CanCollide = true, ngược lại CanCollide = false
+                part.CanCollide = isTouching
+            end
+        end
+    end
+end)
+
 -- ==========================================
 -- SLIDE 7: Infinite yield
 -- ==========================================
