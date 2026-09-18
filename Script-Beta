@@ -686,3 +686,53 @@ ScaleLbl.FocusLost:Connect(function()
         ScaleLbl.Text = "Kích thước GUI: " .. tostring(currentScale)
     end
 end)
+-- ==========================================
+-- SLIDE 9: Air Walk (Bay / Đi trên không)
+-- ==========================================
+local Slide9 = createSlide("Air Walk")
+
+local flyToggle = false
+local flySpeed = 50
+local flyConnection = nil
+local bv = nil
+
+local FlyBtn = createStyledButton(Slide9, "Đi trên không (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+FlyBtn.MouseButton1Click:Connect(function()
+    flyToggle = not flyToggle
+    FlyBtn.Text = "Đi trên không (" .. (flyToggle and "ON" or "OFF") .. ")"
+    FlyBtn.BackgroundColor3 = flyToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if flyToggle and hrp then
+        -- Tạo BodyVelocity duy nhất 1 lần (tránh spam tạo mới)
+        bv = Instance.new("BodyVelocity")
+        bv.Name = "AirWalkVelocity"
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bv.Velocity = Vector3.zero
+        bv.Parent = hrp
+
+        -- Cập nhật hướng bay nhẹ nhàng theo RenderStepped
+        flyConnection = RunService.RenderStepped:Connect(function()
+            if hrp and bv then
+                local cam = Workspace.CurrentCamera
+                local moveDir = Vector3.zero
+
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+                bv.Velocity = moveDir * flySpeed
+            end
+        end)
+    else
+        -- Dọn dẹp tài nguyên khi tắt
+        if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+        if bv then bv:Destroy() bv = nil end
+    end
+end)
