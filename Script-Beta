@@ -216,7 +216,7 @@ local function createStyledTextBox(parent, placeholder, pos, size)
     return box
 end
 
--- // HÀM TẠO NÚT BẬT/TẮT TÍCH HỢP KEYBIND (METEOR CLIENT STYLE)
+-- // HÀM TẠO NÚT BẬT/TẮT TÍCH HỢP KEYBIND (ĐÃ FIX LỖI ĐƯA VỀ NONE)
 local function createKeybindButton(parent, defaultText, pos, size, defaultKey, onToggleCallback)
     size = size or UDim2.new(0, 230, 0, 30)
     
@@ -266,18 +266,19 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
 
     toggleBtn.MouseButton1Click:Connect(executeToggle)
 
+    -- Bấm vào ô gán phím
     keybindBox.MouseButton1Click:Connect(function()
         isBinding = true
         keybindBox.Text = "..."
         keybindBox.TextColor3 = Color3.fromRGB(255, 255, 0)
     end)
 
+    -- Lắng nghe phím bấm
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-
         if isBinding then
             if input.UserInputType == Enum.UserInputType.Keyboard then
-                if input.KeyCode == Enum.KeyCode.Escape then
+                -- Bấm phím ESC, BackSpace, hoặc Delete để đưa về "None"
+                if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace or input.KeyCode == Enum.KeyCode.Delete then
                     currentKey = nil
                     keybindBox.Text = "None"
                 else
@@ -287,13 +288,14 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
                 keybindBox.TextColor3 = Color3.fromRGB(0, 170, 255)
                 isBinding = false
             end
-        elseif currentKey and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == currentKey then
+        elseif not gameProcessed and currentKey and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == currentKey then
             executeToggle()
         end
     end)
 
     return toggleBtn, keybindBox
 end
+
 -- ==========================================
 -- SLIDE 1: Project smash
 -- ==========================================
