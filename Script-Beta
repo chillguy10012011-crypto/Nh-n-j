@@ -736,3 +736,56 @@ FlyBtn.MouseButton1Click:Connect(function()
         if bv then bv:Destroy() bv = nil end
     end
 end)
+-- ==========================================
+-- SLIDE 10: Tốc biến Blox Fruit
+-- ==========================================
+local Slide10 = createSlide("Tốc biến")
+
+local flashStepToggle = false
+local flashStepDistance = 100 -- Khoảng cách tốc biến tối đa (studs)
+local flashStepConnection = nil
+
+local FlashBtn = createStyledButton(Slide10, "Nút 1: Tốc biến [Phím R] (OFF)", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35))
+
+-- Hàm tính toán vị trí chuột trong không gian 3D
+local function getMouseTargetPosition()
+    local mousePos = UserInputService:GetMouseLocation()
+    local ray = Workspace.CurrentCamera:ScreenPointToRay(mousePos.X, mousePos.Y)
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    if LocalPlayer.Character then
+        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    end
+
+    -- Bắn tia Raycast từ Camera đến vị trí con trỏ chuột
+    local result = Workspace:Raycast(ray.Origin, ray.Direction * flashStepDistance, raycastParams)
+    
+    if result then
+        return result.Position
+    else
+        return ray.Origin + (ray.Direction * flashStepDistance)
+    end
+end
+
+-- Bắt sự kiện phím R
+flashStepConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end -- Bỏ qua nếu đang gõ khung Chat
+    
+    if flashStepToggle and input.KeyCode == Enum.KeyCode.R then
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if hrp then
+            local targetPos = getMouseTargetPosition()
+            -- Giữ nguyên độ cao đứng nếu hướng chỉ vào khoảng không, hoặc dịch chuyển chính xác tới vị trí chỉ chuột
+            hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 2.5, 0), targetPos)
+        end
+    end
+end)
+
+FlashBtn.MouseButton1Click:Connect(function()
+    flashStepToggle = not flashStepToggle
+    FlashBtn.Text = "Nút 1: Tốc biến [Phím R] (" .. (flashStepToggle and "ON" or "OFF") .. ")"
+    FlashBtn.BackgroundColor3 = flashStepToggle and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
