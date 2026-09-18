@@ -40,7 +40,7 @@ end
 
 -- // TẠO SCREEN GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DemoGUI"
+ScreenGui.Name = "DemoGUI_Scaled"
 ScreenGui.ResetOnSpawn = false
 
 pcall(function() ScreenGui.Parent = CoreGui end)
@@ -67,15 +67,19 @@ ToggleCorner.Parent = ToggleBtn
 enableDragging(ToggleBtn)
 
 -- // KHUNG CHÍNH (MAIN FRAME)
-local baseWidth, baseHeight = 275, 175
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, baseWidth * 2, 0, baseHeight * 2)
+MainFrame.Size = UDim2.new(0, 550, 0, 350)
 MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 MainFrame.BorderSizePixel = 2
 MainFrame.Parent = ScreenGui
+
+-- // TÍCH HỢP UISCALE ĐỂ TỰ ĐỘNG PHÓNG TO/THU NHỎ TOÀN BỘ CÁC NÚT & CHỮ
+local MainScale = Instance.new("UIScale")
+MainScale.Scale = 1 -- Scale mặc định tương ứng mức 2 (Mức 1 = 0.5, Mức 2 = 1, Mức 4 = 2)
+MainScale.Parent = MainFrame
 
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
@@ -133,6 +137,9 @@ ContentArea.BorderSizePixel = 0
 ContentArea.Parent = MainFrame
 
 local slides = {}
+local registeredBorders = {MainFrame, TitleBar, Sidebar}
+local registeredBackgrounds = {MainFrame, ContentArea}
+local registeredTexts = {TitleText}
 
 -- // HÀM TẠO SLIDE
 local function createSlide(name)
@@ -157,6 +164,9 @@ local function createSlide(name)
     navButton.TextSize = 14
     navButton.Parent = Sidebar
 
+    table.insert(registeredBorders, navButton)
+    table.insert(registeredTexts, navButton)
+
     navButton.MouseButton1Click:Connect(function()
         for _, s in pairs(slides) do s.Visible = false end
         slideFrame.Visible = true
@@ -168,7 +178,7 @@ end
 
 -- // HÀM TẠO NÚT BẬT/TẮT KEYBIND
 local function createKeybindButton(parent, defaultText, pos, size, defaultKey, onToggleCallback)
-    size = size or UDim2.new(0, 230, 0, 30)
+    size = size or UDim2.new(0, 370, 0, 30)
     
     local mainFrame = Instance.new("Frame")
     mainFrame.Size = size
@@ -177,7 +187,7 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
     mainFrame.Parent = parent
 
     local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(1, -45, 1, 0)
+    toggleBtn.Size = UDim2.new(1, -50, 1, 0)
     toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     toggleBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
     toggleBtn.BorderSizePixel = 1
@@ -188,8 +198,8 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
     toggleBtn.Parent = mainFrame
 
     local keybindBox = Instance.new("TextButton")
-    keybindBox.Size = UDim2.new(0, 40, 1, 0)
-    keybindBox.Position = UDim2.new(1, -40, 0, 0)
+    keybindBox.Size = UDim2.new(0, 45, 1, 0)
+    keybindBox.Position = UDim2.new(1, -45, 0, 0)
     keybindBox.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     keybindBox.BorderColor3 = Color3.fromRGB(0, 170, 255)
     keybindBox.BorderSizePixel = 1
@@ -198,6 +208,10 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
     keybindBox.Font = Enum.Font.SourceSansBold
     keybindBox.TextSize = 12
     keybindBox.Parent = mainFrame
+
+    table.insert(registeredBorders, toggleBtn)
+    table.insert(registeredBorders, keybindBox)
+    table.insert(registeredTexts, toggleBtn)
 
     local isToggled = false
     local currentKey = defaultKey
@@ -245,19 +259,18 @@ end
 local Slide1 = createSlide("Trang chính")
 Slide1.Visible = true
 
-createKeybindButton(Slide1, "Chức năng Mẫu 1", UDim2.new(0, 10, 0, 20), UDim2.new(0, 230, 0, 35), Enum.KeyCode.E, function(state)
-    -- Chưa tích hợp code
-end)
+createKeybindButton(Slide1, "Chức năng Mẫu 1", UDim2.new(0, 10, 0, 20), UDim2.new(0, 370, 0, 35), Enum.KeyCode.E, function(state) end)
+createKeybindButton(Slide1, "Chức năng Mẫu 2", UDim2.new(0, 10, 0, 65), UDim2.new(0, 370, 0, 35), nil, function(state) end)
 
-createKeybindButton(Slide1, "Chức năng Mẫu 2", UDim2.new(0, 10, 0, 65), UDim2.new(0, 230, 0, 35), nil, function(state)
-    -- Chưa tích hợp code
-end)
+-- ==========================================
+-- SLIDE SETTING (CÀI ĐẶT)
+-- ==========================================
+local SettingSlide = createSlide("Setting")
 
-local Slide2 = createSlide("Cài đặt")
-
+-- 1. KÍCH THƯỚC GUI (SLIDER)
 local ScaleLbl = Instance.new("TextBox")
-ScaleLbl.Size = UDim2.new(0, 230, 0, 25)
-ScaleLbl.Position = UDim2.new(0, 10, 0, 20)
+ScaleLbl.Size = UDim2.new(0, 370, 0, 25)
+ScaleLbl.Position = UDim2.new(0, 10, 0, 10)
 ScaleLbl.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 ScaleLbl.BorderColor3 = Color3.fromRGB(0, 170, 255)
 ScaleLbl.BorderSizePixel = 1
@@ -265,15 +278,20 @@ ScaleLbl.Text = "Kích thước GUI: 2"
 ScaleLbl.TextColor3 = Color3.fromRGB(0, 170, 255)
 ScaleLbl.Font = Enum.Font.SourceSans
 ScaleLbl.TextSize = 14
-ScaleLbl.Parent = Slide2
+ScaleLbl.Parent = SettingSlide
+
+table.insert(registeredBorders, ScaleLbl)
+table.insert(registeredTexts, ScaleLbl)
 
 local GuiSliderFrame = Instance.new("Frame")
-GuiSliderFrame.Size = UDim2.new(0, 230, 0, 15)
-GuiSliderFrame.Position = UDim2.new(0, 10, 0, 50)
+GuiSliderFrame.Size = UDim2.new(0, 370, 0, 15)
+GuiSliderFrame.Position = UDim2.new(0, 10, 0, 40)
 GuiSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 GuiSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 GuiSliderFrame.BorderSizePixel = 1
-GuiSliderFrame.Parent = Slide2
+GuiSliderFrame.Parent = SettingSlide
+
+table.insert(registeredBorders, GuiSliderFrame)
 
 local GuiSliderFill = Instance.new("Frame")
 GuiSliderFill.Size = UDim2.new((2 - 1) / 3, 0, 1, 0)
@@ -285,10 +303,12 @@ local isDraggingGuiSlider = false
 
 local function updateGuiScale(val)
     val = math.clamp(val, 1, 4)
-    local currentScale = math.floor(val * 10 + 0.5) / 10
-    GuiSliderFill.Size = UDim2.new((currentScale - 1) / 3, 0, 1, 0)
-    ScaleLbl.Text = "Kích thước GUI: " .. tostring(currentScale)
-    MainFrame.Size = UDim2.new(0, baseWidth * currentScale, 0, baseHeight * currentScale)
+    local currentVal = math.floor(val * 10 + 0.5) / 10
+    GuiSliderFill.Size = UDim2.new((currentVal - 1) / 3, 0, 1, 0)
+    ScaleLbl.Text = "Kích thước GUI: " .. tostring(currentVal)
+    
+    -- Chuyển đổi mức 1->4 thành tỉ lệ Scale tương ứng (1 = 0.5x, 2 = 1.0x, 4 = 2.0x)
+    MainScale.Scale = 0.5 + ((currentVal - 1) / 3) * 1.5
 end
 
 GuiSliderFrame.InputBegan:Connect(function(input)
@@ -309,5 +329,113 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         isDraggingGuiSlider = false
+    end
+end)
+
+-- 2. HÀM TẠO BẢNG CHỌN MÀU (COLOR PALETTE)
+local paletteColors = {
+    Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50),
+    Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 0, 255), Color3.fromRGB(255, 150, 0),
+    Color3.fromRGB(150, 0, 255), Color3.fromRGB(255, 255, 255), Color3.fromRGB(35, 35, 35)
+}
+
+local function createColorPicker(title, pos, applyCallback)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 370, 0, 20)
+    lbl.Position = pos
+    lbl.BackgroundTransparency = 1
+    lbl.Text = title
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.SourceSansBold
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = SettingSlide
+
+    table.insert(registeredTexts, lbl)
+
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0, 370, 0, 25)
+    container.Position = pos + UDim2.new(0, 0, 0, 22)
+    container.BackgroundTransparency = 1
+    container.Parent = SettingSlide
+
+    local layout = Instance.new("UIListLayout")
+    layout.FillDirection = Enum.FillDirection.Horizontal
+    layout.Padding = UDim.new(0, 5)
+    layout.Parent = container
+
+    for _, col in ipairs(paletteColors) do
+        local cBtn = Instance.new("TextButton")
+        cBtn.Size = UDim2.new(0, 35, 0, 22)
+        cBtn.BackgroundColor3 = col
+        cBtn.BorderColor3 = Color3.fromRGB(200, 200, 200)
+        cBtn.BorderSizePixel = 1
+        cBtn.Text = ""
+        cBtn.Parent = container
+
+        cBtn.MouseButton1Click:Connect(function()
+            applyCallback(col)
+        end)
+    end
+end
+
+-- Bảng 1: Chỉnh màu viền GUI
+createColorPicker("Bảng 1: Màu viền GUI", UDim2.new(0, 10, 0, 68), function(color)
+    for _, elem in ipairs(registeredBorders) do
+        elem.BorderColor3 = color
+    end
+    GuiSliderFill.BackgroundColor3 = color
+end)
+
+-- Bảng 2: Chỉnh màu nền GUI
+createColorPicker("Bảng 2: Màu nền GUI", UDim2.new(0, 10, 0, 120), function(color)
+    for _, elem in ipairs(registeredBackgrounds) do
+        elem.BackgroundColor3 = color
+    end
+end)
+
+-- Bảng 3: Chỉnh màu chữ
+createColorPicker("Bảng 3: Màu chữ GUI", UDim2.new(0, 10, 0, 172), function(color)
+    for _, elem in ipairs(registeredTexts) do
+        if elem:IsA("TextLabel") or elem:IsA("TextButton") or elem:IsA("TextBox") then
+            elem.TextColor3 = color
+        end
+    end
+end)
+
+-- 3. NÚT KHÔI PHỤC MÀU MẶC ĐỊNH (DEFAULT)
+local ResetColorBtn = Instance.new("TextButton")
+ResetColorBtn.Size = UDim2.new(0, 370, 0, 30)
+ResetColorBtn.Position = UDim2.new(0, 10, 0, 228)
+ResetColorBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+ResetColorBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ResetColorBtn.BorderSizePixel = 1
+ResetColorBtn.Text = "Khôi phục màu mặc định (Default)"
+ResetColorBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
+ResetColorBtn.Font = Enum.Font.SourceSansBold
+ResetColorBtn.TextSize = 13
+ResetColorBtn.Parent = SettingSlide
+
+table.insert(registeredBorders, ResetColorBtn)
+
+ResetColorBtn.MouseButton1Click:Connect(function()
+    local defaultBorder = Color3.fromRGB(0, 170, 255)
+    local defaultBg = Color3.fromRGB(35, 35, 35)
+
+    for _, elem in ipairs(registeredBorders) do
+        elem.BorderColor3 = defaultBorder
+    end
+    GuiSliderFill.BackgroundColor3 = defaultBorder
+
+    for _, elem in ipairs(registeredBackgrounds) do
+        elem.BackgroundColor3 = defaultBg
+    end
+
+    for _, elem in ipairs(registeredTexts) do
+        if elem == TitleText or elem == ScaleLbl then
+            elem.TextColor3 = defaultBorder
+        else
+            elem.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
     end
 end)
