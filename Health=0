@@ -1,42 +1,9 @@
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+local player = game.Players.LocalPlayer
 
-local function makeVisualZeroHealth(char)
-    local hum = char:WaitForChild("Humanoid", 5)
-    if not hum then return end
-
-    -- 1. Giữ máu thật ở mức 0.001 (Server tính là còn sống nên KHÔNG Respawn, vẫn đánh chiêu bình thường)
-    RunService.RenderStepped:Connect(function()
-        if hum and hum.Parent and hum.Health > 0 then
-            -- Duy trì máu cực nhỏ
-            hum.Health = 0.001
-        end
-    end)
-
-    -- 2. Ép thanh máu GUI hiển thị cạn sạch màu đỏ (0%)
-    local function forceRedEmptyBar()
-        for _, gui in pairs(char:GetDescendants()) do
-            if gui:IsA("BillboardGui") or gui:IsA("SurfaceGui") then
-                for _, frame in pairs(gui:GetDescendants()) do
-                    if frame:IsA("Frame") and (frame.Name:lower():find("health") or frame.Name:lower():find("bar")) then
-                        pcall(function()
-                            frame.Size = UDim2.new(0, 0, 1, 0) -- Ép vạch máu về 0%
-                        end)
-                    end
-                end
-            end
-        end
+RunService.RenderStepped:Connect(function()
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local humanoid = player.Character.Humanoid
+        humanoid.Health = humanoid.MaxHealth
     end
-
-    -- Liên tục cập nhật để giao diện không bị game khôi phục lại
-    RunService.Heartbeat:Connect(forceRedEmptyBar)
-end
-
--- Kích hoạt cho nhân vật hiện tại
-if LocalPlayer.Character then 
-    makeVisualZeroHealth(LocalPlayer.Character) 
-end
-
--- Kích hoạt lại khi đổi nhân vật / Respawn
-LocalPlayer.CharacterAdded:Connect(makeVisualZeroHealth)
+end)
