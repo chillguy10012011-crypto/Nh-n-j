@@ -1,31 +1,42 @@
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local function disableClientRespawn(char)
+local function makeVisualZeroHealth(char)
     local hum = char:WaitForChild("Humanoid", 5)
     if not hum then return end
 
-    -- Vô hiệu hóa tính năng Reset character từ Menu Roblox
-    local SetCore = function()
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("ResetButtonCallback", false)
-        end)
-    end
-    SetCore()
-
-    -- Ngắt trạng thái Dead và khóa chuyển trạng thái
-    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-    
-    -- Giữ máu ở 0 nhưng liên tục ép trạng thái di chuyển (Running)
-    hum.HealthChanged:Connect(function()
-        if hum.Health <= 0 then
-            hum.Health = 0
-            hum:ChangeState(Enum.HumanoidStateType.Running)
-            hum.WalkSpeed = 16
-            hum.JumpPower = 50
+    -- 1. Giữ máu thật ở mức 0.001 (Server tính là còn sống nên KHÔNG Respawn, vẫn đánh chiêu bình thường)
+    RunService.RenderStepped:Connect(function()
+        if hum and hum.Parent and hum.Health > 0 then
+            -- Duy trì máu cực nhỏ
+            hum.Health = 0.001
         end
     end)
+
+    -- 2. Ép thanh máu GUI hiển thị cạn sạch màu đỏ (0%)
+    local function forceRedEmptyBar()
+        for _, gui in pairs(char:GetDescendants()) do
+            if gui:IsA("BillboardGui") or gui:IsA("SurfaceGui") then
+                for _, frame in pairs(gui:GetDescendants()) do
+                    if frame:IsA("Frame") and (frame.Name:lower():find("health") or frame.Name:lower():find("bar")) then
+                        pcall(function()
+                            frame.Size = UDim2.new(0, 0, 1, 0) -- Ép vạch máu về 0%
+                        end)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Liên tục cập nhật để giao diện không bị game khôi phục lại
+    RunService.Heartbeat:Connect(forceRedEmptyBar)
 end
 
-if LocalPlayer.Character then disableClientRespawn(LocalPlayer.Character) end
-LocalPlayer.CharacterAdded:Connect(disableClientRespawn)
+-- Kích hoạt cho nhân vật hiện tại
+if LocalPlayer.Character then 
+    makeVisualZeroHealth(LocalPlayer.Character) 
+end
+
+-- Kích hoạt lại khi đổi nhân vật / Respawn
+LocalPlayer.CharacterAdded:Connect(makeVisualZeroHealth)
