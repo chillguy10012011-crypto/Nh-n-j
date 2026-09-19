@@ -1,9 +1,0 @@
-local RunService = game:GetService("RunService")
-local player = game.Players.LocalPlayer
-
-RunService.RenderStepped:Connect(function()
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        local humanoid = player.Character.Humanoid
-        humanoid.Health = humanoid.MaxHealth
-    end
-end)
