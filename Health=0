@@ -2,45 +2,33 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local function enableZeroHealthWalk(character)
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    if not humanoid then return end
+local function fakeZeroHealth(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if not hum then return end
 
-    -- Vô hiệu hóa hoàn toàn trạng thái Dead để không bị Respawn hay té ngã[span_1](start_span)[span_1](end_span)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-
-    -- Khóa giữ WalkSpeed và JumpPower không bị reset về 0 khi cạn máu
-    local defaultSpeed = 16
-    local defaultJump = 50
-
-    -- Lắng nghe sự thay đổi máu liên tục
-    humanoid.HealthChanged:Connect(function(health)
-        if health <= 0 then
-            -- Ép thanh máu giữ mốc 0[span_2](start_span)[span_2](end_span)
-            humanoid.Health = 0
-            
-            -- Đảm bảo nhân vật vẫn giữ được khả năng di chuyển
-            humanoid.WalkSpeed = defaultSpeed
-            humanoid.JumpPower = defaultJump
-            humanoid.PlatformStand = false
-        end
-    end)
-
-    -- Đảm bảo nhân vật duy trì trạng thái đứng thẳng
-    RunService.Stepped:Connect(function()
-        if humanoid.Health <= 0 then
-            humanoid.Health = 0
-            if humanoid:GetState() == Enum.HumanoidStateType.Dead then
-                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    -- Giữ máu thật ở mức cực thấp để Server không kích hoạt Respawn
+    RunService.RenderStepped:Connect(function()
+        if hum and hum.Parent then
+            if hum.Health <= 1 then
+                hum.Health = 0.001 -- Máu thật > 0 nên không bao giờ bị Respawn
             end
         end
     end)
+
+    -- Tìm và ép thanh máu BillboardGui trên đầu hiển thị cạn sạch (Máu 0)
+    local head = char:WaitForChild("Head", 5)
+    if head then
+        head.ChildAdded:Connect(function(child)
+            if child:IsA("BillboardGui") then
+                for _, frame in pairs(child:GetDescendants()) do
+                    if frame:IsA("Frame") and frame.Name:lower():find("health") then
+                        frame.Size = UDim2.new(0, 0, 1, 0) -- Tùy chỉnh vạch máu về 0%
+                    end
+                end
+            end
+        end)
+    end
 end
 
--- Áp dụng cho Character hiện tại
-if LocalPlayer.Character then
-    enableZeroHealthWalk(LocalPlayer.Character)
-end
-
--- Áp dụng khi nhân vật mới xuất hiện (Respawn)
-LocalPlayer.CharacterAdded:Connect(enableZeroHealthWalk)
+if LocalPlayer.Character then fakeZeroHealth(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(fakeZeroHealth)
