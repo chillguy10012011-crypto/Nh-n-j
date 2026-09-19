@@ -193,7 +193,7 @@ local function createSlide(name)
     slideFrame.BackgroundTransparency = 1
     slideFrame.BorderSizePixel = 0
     slideFrame.ScrollBarThickness = 6
-    slideFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    slideFrame.CanvasSize = UDim2.new(0, 0, 0, 350)
     slideFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     slideFrame.Visible = false
     slideFrame.Parent = ContentArea
@@ -589,7 +589,7 @@ createKeybindButton(SlideMain, "Highlight Players", UDim2.new(0.025, 0, 0, 201),
 end)
 
 -- NÚT 4: Tracers & Box ESP
-createKeybindButton(SlideMain, "Tracers", UDim2.new(0.025, 0, 0, 234), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+createKeybindButton(SlideMain, "Tracers & Box", UDim2.new(0.025, 0, 0, 234), UDim2.new(0.95, 0, 0, 28), nil, function(state)
     tracersToggle = state
 end)
 
@@ -645,10 +645,10 @@ RunService.RenderStepped:Connect(function()
                     hl.Parent = p.Character
                 end
                 if p == LocalPlayer then
-                    hl.FillColor = Color3.fromRGB(0, 170, 255) -- Xanh biển cho bản thân
+                    hl.FillColor = Color3.fromRGB(0, 170, 255)
                     hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                 else
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)     -- Đỏ cho người chơi khác
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
                     hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                 end
             else
@@ -661,9 +661,9 @@ RunService.RenderStepped:Connect(function()
     tracersFolder:ClearAllChildren()
     if tracersToggle and myHrp then
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Head") then
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local hrp = p.Character.HumanoidRootPart
-                local head = p.Character.Head
+                local head = p.Character:FindFirstChild("Head") or hrp
                 
                 local hrpPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
 
@@ -684,18 +684,21 @@ RunService.RenderStepped:Connect(function()
                     line.Parent = tracersFolder
 
                     -- B. KHUNG CHỮ NHẬT (BOX ESP / HITBOX) XUNG QUANH PLAYER
-                    local headPos = cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                    local legPos = cam:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                    local headWorldPos = head.Position + Vector3.new(0, 1.5, 0)
+                    local legWorldPos = hrp.Position - Vector3.new(0, 3, 0)
 
-                    local boxHeight = math.abs(headPos.Y - legPos.Y)
-                    local boxWidth = boxHeight * 0.65
+                    local headScreenPos = cam:WorldToViewportPoint(headWorldPos)
+                    local legScreenPos = cam:WorldToViewportPoint(legWorldPos)
+
+                    local boxHeight = math.abs(headScreenPos.Y - legScreenPos.Y)
+                    local boxWidth = boxHeight * 0.6
 
                     local box = Instance.new("Frame")
                     box.Size = UDim2.new(0, boxWidth, 0, boxHeight)
                     box.Position = UDim2.new(0, hrpPos.X - (boxWidth / 2), 0, hrpPos.Y - (boxHeight / 2))
                     box.BackgroundTransparency = 1
                     box.BorderColor3 = Color3.fromRGB(255, 0, 0)
-                    box.BorderSizePixel = 1.5
+                    box.BorderSizePixel = 2
                     box.Parent = tracersFolder
                 end
             end
