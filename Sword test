@@ -1,0 +1,81 @@
+-- // FE SWORD ORBIT (HACKER STYLE) - NGƯỜI KHÁC VẪN NHÌN THẤY
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local function getCharacter()
+    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+
+local char = getCharacter()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+-- Thu thập toàn bộ Tool (Kiếm) trong Balo và Nhân vật
+local tools = {}
+for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
+    if item:IsA("Tool") and item:FindFirstChild("Handle") then
+        table.insert(tools, item)
+    end
+end
+for _, item in pairs(char:GetChildren()) do
+    if item:IsA("Tool") and item:FindFirstChild("Handle") then
+        table.insert(tools, item)
+    end
+end
+
+if #tools == 0 then
+    warn("Bạn cần có ít nhất 1 Tool/Kiếm trong Balo để làm hiệu ứng!")
+    return
+end
+
+-- Thiết lập trạng thái Tool để Server không lấy lại quyền điều khiển
+for _, tool in pairs(tools) do
+    tool.Parent = char
+    local handle = tool:FindFirstChild("Handle")
+    if handle then
+        handle.CanCollide = false
+        -- Xóa Weld / RightGrip để tách kiếm khỏi tay
+        for _, v in pairs(handle:GetDescendants()) do
+            if v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("Motor6D") then
+                v:Destroy()
+            end
+        end
+        if char:FindFirstChild("Righthand") or char:FindFirstChild("Right Arm") then
+            local grip = handle:FindFirstChild("RightGrip")
+            if grip then grip:Destroy() end
+        end
+    end
+end
+
+-- Cấu hình Orbit
+local radius = 6       -- Khoảng cách kiếm bay quanh người
+local rotateSpeed = 3  -- Tốc độ xoay
+local angle = 0
+
+-- Vòng lặp điều khiển vật lý (Bypass FE)
+local connection
+connection = RunService.Heartbeat:Connect(function(dt)
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        connection:Disconnect()
+        return
+    end
+
+    angle = angle + (dt * rotateSpeed)
+
+    for i, tool in ipairs(tools) do
+        local handle = tool:FindFirstChild("Handle")
+        if handle then
+            -- Bật tính năng mô phỏng vật lý liên tục để giữ NetworkOwner
+            handle.Velocity = Vector3.new(30, 0, 0) 
+            
+            -- Tính vị trí vòng xoay
+            local offsetAngle = angle + ((i - 1) * (math.pi * 2 / #tools))
+            local x = math.cos(offsetAngle) * radius
+            local z = math.sin(offsetAngle) * radius
+            
+            -- Cập nhật CFrame vị trí mới cho Handle
+            local targetPos = hrp.Position + Vector3.new(x, 1.5, z)
+            handle.CFrame = CFrame.new(targetPos, hrp.Position) * CFrame.Angles(math.rad(90), 0, 0)
+        end
+    end
+end)
