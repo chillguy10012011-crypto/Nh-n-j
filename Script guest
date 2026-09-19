@@ -1,5 +1,5 @@
 -- ==========================================
--- CODE - PHẦN 1/2
+-- CODE CHO KHÁCH - PHẦN 1/3
 -- ==========================================
 
 -- // TỐI ƯU HÀM BẢO MẬT CLONEREF
@@ -181,6 +181,9 @@ local function applyTheme(bgColor, borderColor, textColor)
         end
     end
 end
+-- ==========================================
+-- CODE CHO KHÁCH - PHẦN 2/3
+-- ==========================================
 
 -- // KHUNG SLIDE NỘI DUNG
 local function createSlide(name)
@@ -475,7 +478,7 @@ ResetColorBtn.MouseButton1Click:Connect(function()
     )
 end)
 -- ==========================================
--- CODE - PHẦN 2/2
+-- CODE CHO KHÁCH - PHẦN 3/3
 -- ==========================================
 
 local SlideMain = createSlide("Main Features")
@@ -585,7 +588,7 @@ createKeybindButton(SlideMain, "Highlight Players", UDim2.new(0.025, 0, 0, 201),
     highlightToggle = state
 end)
 
--- NÚT 4: Tracers
+-- NÚT 4: Tracers & Box ESP
 createKeybindButton(SlideMain, "Tracers", UDim2.new(0.025, 0, 0, 234), UDim2.new(0.95, 0, 0, 28), nil, function(state)
     tracersToggle = state
 end)
@@ -595,7 +598,7 @@ createKeybindButton(SlideMain, "Show Name", UDim2.new(0.025, 0, 0, 267), UDim2.n
     showNameToggle = state
 end)
 
--- // LỚP DÙNG CHO TRACERS (LINES)
+-- // LỚP DÙNG CHO TRACERS VÀ BOX ESP
 local tracersFolder = Instance.new("Folder")
 tracersFolder.Name = "TracersFolder"
 tracersFolder.Parent = ScreenGui
@@ -654,21 +657,24 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 4. TRACERS
+    -- 4. TRACERS & BOX ESP
     tracersFolder:ClearAllChildren()
     if tracersToggle and myHrp then
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local targetHrp = p.Character.HumanoidRootPart
-                local screenPos, onScreen = cam:WorldToViewportPoint(targetHrp.Position)
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Head") then
+                local hrp = p.Character.HumanoidRootPart
+                local head = p.Character.Head
+                
+                local hrpPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
 
                 if onScreen then
+                    -- A. ĐƯỜNG KẺ TRACER TỪ ĐÁY MÀN HÌNH TỚI PLAYER
                     local line = Instance.new("Frame")
                     line.BorderSizePixel = 0
                     line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
                     local startPos = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
-                    local endPos = Vector2.new(screenPos.X, screenPos.Y)
+                    local endPos = Vector2.new(hrpPos.X, hrpPos.Y)
                     local distance = (endPos - startPos).Magnitude
 
                     line.Size = UDim2.new(0, distance, 0, 1.5)
@@ -676,6 +682,21 @@ RunService.RenderStepped:Connect(function()
                     line.AnchorPoint = Vector2.new(0, 0.5)
                     line.Rotation = math.deg(math.atan2(endPos.Y - startPos.Y, endPos.X - startPos.X))
                     line.Parent = tracersFolder
+
+                    -- B. KHUNG CHỮ NHẬT (BOX ESP / HITBOX) XUNG QUANH PLAYER
+                    local headPos = cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                    local legPos = cam:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+                    local boxHeight = math.abs(headPos.Y - legPos.Y)
+                    local boxWidth = boxHeight * 0.65
+
+                    local box = Instance.new("Frame")
+                    box.Size = UDim2.new(0, boxWidth, 0, boxHeight)
+                    box.Position = UDim2.new(0, hrpPos.X - (boxWidth / 2), 0, hrpPos.Y - (boxHeight / 2))
+                    box.BackgroundTransparency = 1
+                    box.BorderColor3 = Color3.fromRGB(255, 0, 0)
+                    box.BorderSizePixel = 1.5
+                    box.Parent = tracersFolder
                 end
             end
         end
