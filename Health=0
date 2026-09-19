@@ -1,0 +1,42 @@
+-- // KHAI BÁO SERVICES & PLAYER
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local function applyGodState(character)
+    if not character then return end
+    
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    -- 1. Tắt thuộc tính rã thể xác khi chết
+    humanoid.BreakJointsOnDeath = false
+
+    -- 2. CHẶN STATE: Vô hiệu hóa hoàn toàn State Dead của Humanoid
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+
+    -- 3. Ép trạng thái về Running hoặc GettingUp nếu bị ép về 0 HP
+    humanoid.StateChanged:Connect(function(oldState, newState)
+        if newState == Enum.HumanoidStateType.Dead then
+            -- Ép Humanoid chuyển sang State khác để không bị "đóng đóng băng"
+            humanoid:ChangeState(Enum.HumanoidStateType.Running)
+        end
+    end)
+
+    -- 4. Khóa giữ cho nhân vật đứng vững & di chuyển liên tục dù HP = 0
+    RunService.RenderStepped:Connect(function()
+        if humanoid and humanoid.Health <= 0 then
+            -- Ép trạng thái liên tục để tránh bị Engine đưa vào Ragdoll/Dead
+            humanoid:ChangeState(Enum.HumanoidStateType.Running)
+        end
+    end)
+end
+
+-- Áp dụng cho Character hiện tại và khi Respawn lại
+if LocalPlayer.Character then
+    applyGodState(LocalPlayer.Character)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    applyGodState(newCharacter)
+end)
