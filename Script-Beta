@@ -331,6 +331,7 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
 
     return toggleBtn, keybindBox
 end
+
 -- ==========================================
 -- SLIDE 1: Project smash
 -- ==========================================
@@ -438,13 +439,71 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
-local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 264), UDim2.new(0.95, 0, 0, 22))
+-- LOGIC BẬT/TẮT ANTI-STUN MỚI THÊM
+local AntiStunToggle = false
+local antiStunConnection = nil
+
+local function updateAntiStunState(char)
+    if not char then return end
+    local humanoid = char:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, not AntiStunToggle)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not AntiStunToggle)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, not AntiStunToggle)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, not AntiStunToggle)
+end
+
+createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    AntiStunToggle = state
+    
+    if LocalPlayer.Character then
+        updateAntiStunState(LocalPlayer.Character)
+    end
+
+    if AntiStunToggle then
+        if not antiStunConnection then
+            antiStunConnection = RunService.RenderStepped:Connect(function()
+                local char = LocalPlayer.Character
+                if not char or not char:IsDescendantOf(Workspace) then return end
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if not humanoid or humanoid.Health <= 0 then return end
+
+                if humanoid.Sit then
+                    humanoid.Sit = false
+                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                end
+
+                local st = humanoid:GetState()
+                if st == Enum.HumanoidStateType.Ragdoll 
+                or st == Enum.HumanoidStateType.FallingDown 
+                or st == Enum.HumanoidStateType.PlatformStanding then
+                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                end
+            end)
+        end
+    else
+        if antiStunConnection then
+            antiStunConnection:Disconnect()
+            antiStunConnection = nil
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if AntiStunToggle then
+        updateAntiStunState(char)
+    end
+end)
+
+-- ĐẨY CÁC THÀNH PHẦN KHÁC XUỐNG DƯỚI ĐỂ TRÁNH ĐÈ LÊN NÚT MỚI
+local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
 
 local SliderFrame = Instance.new("Frame")
 SliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
-SliderFrame.Position = UDim2.new(0.025, 0, 0, 291)
+SliderFrame.Position = UDim2.new(0.025, 0, 0, 324)
 SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 SliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 SliderFrame.BorderSizePixel = 1
@@ -540,6 +599,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+
 
 -- ==========================================
 -- SLIDE 2: Deadrais
