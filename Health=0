@@ -1,34 +1,31 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local function fakeZeroHealth(char)
+local function disableClientRespawn(char)
     local hum = char:WaitForChild("Humanoid", 5)
     if not hum then return end
 
-    -- Giữ máu thật ở mức cực thấp để Server không kích hoạt Respawn
-    RunService.RenderStepped:Connect(function()
-        if hum and hum.Parent then
-            if hum.Health <= 1 then
-                hum.Health = 0.001 -- Máu thật > 0 nên không bao giờ bị Respawn
-            end
-        end
-    end)
-
-    -- Tìm và ép thanh máu BillboardGui trên đầu hiển thị cạn sạch (Máu 0)
-    local head = char:WaitForChild("Head", 5)
-    if head then
-        head.ChildAdded:Connect(function(child)
-            if child:IsA("BillboardGui") then
-                for _, frame in pairs(child:GetDescendants()) do
-                    if frame:IsA("Frame") and frame.Name:lower():find("health") then
-                        frame.Size = UDim2.new(0, 0, 1, 0) -- Tùy chỉnh vạch máu về 0%
-                    end
-                end
-            end
+    -- Vô hiệu hóa tính năng Reset character từ Menu Roblox
+    local SetCore = function()
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("ResetButtonCallback", false)
         end)
     end
+    SetCore()
+
+    -- Ngắt trạng thái Dead và khóa chuyển trạng thái
+    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+    
+    -- Giữ máu ở 0 nhưng liên tục ép trạng thái di chuyển (Running)
+    hum.HealthChanged:Connect(function()
+        if hum.Health <= 0 then
+            hum.Health = 0
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+        end
+    end)
 end
 
-if LocalPlayer.Character then fakeZeroHealth(LocalPlayer.Character) end
-LocalPlayer.CharacterAdded:Connect(fakeZeroHealth)
+if LocalPlayer.Character then disableClientRespawn(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(disableClientRespawn)
