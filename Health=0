@@ -2,29 +2,45 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local function keepZeroHealthNoRespawn(character)
+local function enableZeroHealthWalk(character)
     local humanoid = character:WaitForChild("Humanoid", 5)
     if not humanoid then return end
 
-    -- Tắt tự động hồi máu nếu game có hệ thống hồi máu mặc định
+    -- Vô hiệu hóa hoàn toàn trạng thái Dead để không bị Respawn hay té ngã[span_1](start_span)[span_1](end_span)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+
+    -- Khóa giữ WalkSpeed và JumpPower không bị reset về 0 khi cạn máu
+    local defaultSpeed = 16
+    local defaultJump = 50
+
+    -- Lắng nghe sự thay đổi máu liên tục
     humanoid.HealthChanged:Connect(function(health)
         if health <= 0 then
-            -- Giữ cố định máu ở mức 0 mà không để trạng thái bị Reset
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            
-            -- Đặt thuộc tínhBreakJointsOnDeath để nhân vật không bị rã các bộ phận
-            character:BreakJoints() -- Bạn có thể bỏ dòng này nếu muốn giữ nguyên dáng đứng
-            
-            -- Khóa không cho Humanoid chuyển sang dạng chết của Roblox
+            -- Ép thanh máu giữ mốc 0[span_2](start_span)[span_2](end_span)
             humanoid.Health = 0
+            
+            -- Đảm bảo nhân vật vẫn giữ được khả năng di chuyển
+            humanoid.WalkSpeed = defaultSpeed
+            humanoid.JumpPower = defaultJump
+            humanoid.PlatformStand = false
+        end
+    end)
+
+    -- Đảm bảo nhân vật duy trì trạng thái đứng thẳng
+    RunService.Stepped:Connect(function()
+        if humanoid.Health <= 0 then
+            humanoid.Health = 0
+            if humanoid:GetState() == Enum.HumanoidStateType.Dead then
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end
         end
     end)
 end
 
 -- Áp dụng cho Character hiện tại
 if LocalPlayer.Character then
-    keepZeroHealthNoRespawn(LocalPlayer.Character)
+    enableZeroHealthWalk(LocalPlayer.Character)
 end
 
--- Áp dụng khi Character mới xuất hiện
-LocalPlayer.CharacterAdded:Connect(keepZeroHealthNoRespawn)
+-- Áp dụng khi nhân vật mới xuất hiện (Respawn)
+LocalPlayer.CharacterAdded:Connect(enableZeroHealthWalk)
