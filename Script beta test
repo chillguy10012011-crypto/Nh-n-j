@@ -1,0 +1,454 @@
+-- =================================================================
+-- PHẦN 1/3: KHỞI TẠO BẢO MẬT CLONEREF, HỆ THỐNG GUI & SLIDE SETTING
+-- =================================================================
+
+local function getService(serviceName)
+    local service = game:GetService(serviceName)
+    if cloneref then
+        return cloneref(service)
+    end
+    return service
+end
+
+local Players = getService("Players")
+local TweenService = getService("TweenService")
+local UserInputService = getService("UserInputService")
+local RunService = getService("RunService")
+local CoreGui = getService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Bảng Màu Mặc Định (Default Scheme)
+local DEFAULT_COLORS = {
+    Background = Color3.fromRGB(25, 25, 35),
+    Border = Color3.fromRGB(0, 150, 255),
+    Text = Color3.fromRGB(255, 255, 255)
+}
+
+local CurrentColors = {
+    Background = DEFAULT_COLORS.Background,
+    Border = DEFAULT_COLORS.Border,
+    Text = DEFAULT_COLORS.Text
+}
+
+-- Khởi tạo ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomFunctionalGUI"
+ScreenGui.ResetOnSpawn = false
+
+if syn and syn.protect_gui then
+    syn.protect_gui(ScreenGui)
+    ScreenGui.Parent = CoreGui
+elseif gethui then
+    ScreenGui.Parent = gethui()
+else
+    ScreenGui.Parent = CoreGui
+end
+
+-- MainFrame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 550, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -275, 0.5, -175)
+MainFrame.BackgroundColor3 = CurrentColors.Background
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = CurrentColors.Border
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UIScale = Instance.new("UIScale")
+UIScale.Scale = 1
+UIScale.Parent = MainFrame
+
+-- TitleBar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -10, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "Functional Hub - Multi-Slide"
+TitleText.TextColor3 = CurrentColors.Text
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 18
+TitleText.Parent = TitleBar
+
+-- Sidebar & Content Frame
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 130, 1, -35)
+Sidebar.Position = UDim2.new(0, 0, 0, 35)
+Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = MainFrame
+
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -135, 1, -40)
+ContentFrame.Position = UDim2.new(0, 135, 0, 38)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+local Slides = {}
+local KeybindList = {}
+
+-- Hàm Tạo Slide (ScrollingFrame)
+local function createSlide(name)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Name = name
+    scroll.Size = UDim2.new(1, 0, 1, 0)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 5
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.Visible = false
+    scroll.Parent = ContentFrame
+    
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 8)
+    layout.Parent = scroll
+    
+    Slides[name] = scroll
+    return scroll
+end
+
+-- Hàm Chuyển Slide
+local function showSlide(name)
+    for slideName, slideObj in pairs(Slides) do
+        slideObj.Visible = (slideName == name)
+    end
+end
+
+-- Quản lý đổi màu GUI
+local ColorElements = { Background = {}, Border = {}, Text = {} }
+
+local function registerElement(element, elementType)
+    table.insert(ColorElements[elementType], element)
+end
+
+local function updateGUIColors()
+    MainFrame.BackgroundColor3 = CurrentColors.Background
+    MainFrame.BorderColor3 = CurrentColors.Border
+    TitleText.TextColor3 = CurrentColors.Text
+    
+    for _, elem in ipairs(ColorElements.Background) do
+        elem.BackgroundColor3 = CurrentColors.Background
+    end
+    for _, elem in ipairs(ColorElements.Border) do
+        if elem:IsA("Frame") or elem:IsA("TextButton") or elem:IsA("TextBox") then
+            elem.BorderColor3 = CurrentColors.Border
+        end
+    end
+    for _, elem in ipairs(ColorElements.Text) do
+        if elem:IsA("TextLabel") or elem:IsA("TextButton") or elem:IsA("TextBox") then
+            elem.TextColor3 = CurrentColors.Text
+        end
+    end
+end
+
+-- Hàm tạo Keybind Button (Meteor Client Style)
+local function createKeybindButton(parent, text, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0.95, 0, 0, 35)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    container.BorderSizePixel = 1
+    container.BorderColor3 = CurrentColors.Border
+    container.Parent = parent
+    registerElement(container, "Border")
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.65, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = text
+    btn.TextColor3 = CurrentColors.Text
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 16
+    btn.Parent = container
+    registerElement(btn, "Text")
+
+    local keyBox = Instance.new("TextBox")
+    keyBox.Size = UDim2.new(0.3, -5, 0.8, 0)
+    keyBox.Position = UDim2.new(0.68, 0, 0.1, 0)
+    keyBox.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    keyBox.BorderColor3 = CurrentColors.Border
+    keyBox.Text = "None"
+    keyBox.TextColor3 = CurrentColors.Text
+    keyBox.Font = Enum.Font.SourceSansBold
+    keyBox.TextSize = 14
+    keyBox.Parent = container
+    registerElement(keyBox, "Border")
+    registerElement(keyBox, "Text")
+
+    local state = false
+    local currentKey = nil
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.TextColor3 = state and Color3.fromRGB(0, 255, 120) or CurrentColors.Text
+        callback(state)
+    end)
+
+    keyBox.Focused:Connect(function()
+        keyBox.Text = "..."
+    end)
+
+    keyBox.FocusLost:Connect(function()
+        local inputStr = keyBox.Text:upper()
+        if inputStr == "" or inputStr == "NONE" or inputStr == "BACKSPACE" or inputStr == "DELETE" or inputStr == "ESCAPE" then
+            currentKey = nil
+            keyBox.Text = "None"
+        else
+            local success, enumKey = pcall(function() return Enum.KeyCode[inputStr] end)
+            if success and enumKey then
+                currentKey = enumKey
+                keyBox.Text = enumKey.Name
+            else
+                keyBox.Text = currentKey and currentKey.Name or "None"
+            end
+        end
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and currentKey and input.KeyCode == currentKey then
+            state = not state
+            btn.TextColor3 = state and Color3.fromRGB(0, 255, 120) or CurrentColors.Text
+            callback(state)
+        end
+    end)
+
+    return container
+end
+-- =================================================================
+-- PHẦN 2/3: SLIDE SETTING (UISCALE & 3 BẢNG MÀU) + SLIDE 1
+-- =================================================================
+
+-- Tạo các Slide
+local Slide1 = createSlide("Slide 1")
+local SlideScriptHub = createSlide("Script Hub")
+local SlideSetting = createSlide("Setting")
+
+-- Button chuyển Slide trên Sidebar
+local sidebarLayout = Instance.new("UIListLayout")
+sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sidebarLayout.Padding = UDim.new(0, 5)
+sidebarLayout.Parent = Sidebar
+
+local function createTabButton(name)
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Size = UDim2.new(1, 0, 0, 30)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    tabBtn.BorderSizePixel = 0
+    tabBtn.Text = name
+    tabBtn.TextColor3 = CurrentColors.Text
+    tabBtn.Font = Enum.Font.SourceSansBold
+    tabBtn.TextSize = 14
+    tabBtn.Parent = Sidebar
+    registerElement(tabBtn, "Text")
+    
+    tabBtn.MouseButton1Click:Connect(function()
+        showSlide(name)
+    end)
+end
+
+createTabButton("Slide 1")
+createTabButton("Script Hub")
+createTabButton("Setting")
+
+----------------------------------------------------
+-- THIẾT LẬP SLIDE SETTING
+----------------------------------------------------
+
+-- 1. Thanh Kéo Chỉnh Scale GUI (UIScale)
+local scaleFrame = Instance.new("Frame")
+scaleFrame.Size = UDim2.new(0.95, 0, 0, 45)
+scaleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+scaleFrame.BorderSizePixel = 1
+scaleFrame.BorderColor3 = CurrentColors.Border
+scaleFrame.Parent = SlideSetting
+registerElement(scaleFrame, "Border")
+
+local scaleLabel = Instance.new("TextLabel")
+scaleLabel.Size = UDim2.new(1, 0, 0, 20)
+scaleLabel.BackgroundTransparency = 1
+scaleLabel.Text = "Kích thước GUI (Scale): 1.0"
+scaleLabel.TextColor3 = CurrentColors.Text
+scaleLabel.Font = Enum.Font.SourceSans
+scaleLabel.TextSize = 14
+scaleLabel.Parent = scaleFrame
+registerElement(scaleLabel, "Text")
+
+local scaleBtn = Instance.new("TextButton")
+scaleBtn.Size = UDim2.new(0.9, 0, 0, 15)
+scaleBtn.Position = UDim2.new(0.05, 0, 0.55, 0)
+scaleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+scaleBtn.Text = ""
+scaleBtn.Parent = scaleFrame
+
+scaleBtn.MouseButton1Click:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation().X
+    local btnPos = scaleBtn.AbsolutePosition.X
+    local btnSize = scaleBtn.AbsoluteSize.X
+    local percent = math.clamp((mousePos - btnPos) / btnSize, 0.5, 1.5)
+    UIScale.Scale = percent
+    scaleLabel.Text = string.format("Kích thước GUI (Scale): %.2f", percent)
+end)
+
+-- 2. Hàm Tạo Bảng Chọn Màu Nhanh (Color Picker Preset)
+local function createColorPalette(titleText, colorType)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.95, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    frame.BorderSizePixel = 1
+    frame.BorderColor3 = CurrentColors.Border
+    frame.Parent = SlideSetting
+    registerElement(frame, "Border")
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0, 20)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = titleText
+    lbl.TextColor3 = CurrentColors.Text
+    lbl.Font = Enum.Font.SourceSans
+    lbl.TextSize = 14
+    lbl.Parent = frame
+    registerElement(lbl, "Text")
+
+    local presetColors = {
+        Color3.fromRGB(25, 25, 35), Color3.fromRGB(0, 150, 255), Color3.fromRGB(255, 255, 255),
+        Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 50), Color3.fromRGB(255, 220, 0),
+        Color3.fromRGB(150, 50, 250)
+    }
+
+    for i, col in ipairs(presetColors) do
+        local cBtn = Instance.new("TextButton")
+        cBtn.Size = UDim2.new(0, 20, 0, 20)
+        cBtn.Position = UDim2.new(0, 10 + (i - 1) * 26, 0, 24)
+        cBtn.BackgroundColor3 = col
+        cBtn.BorderSizePixel = 1
+        cBtn.Text = ""
+        cBtn.Parent = frame
+
+        cBtn.MouseButton1Click:Connect(function()
+            CurrentColors[colorType] = col
+            updateGUIColors()
+        end)
+    end
+end
+
+createColorPalette("Bảng 1: Chỉnh màu Nền GUI", "Background")
+createColorPalette("Bảng 2: Chỉnh màu Viền GUI", "Border")
+createColorPalette("Bảng 3: Chỉnh màu Chữ", "Text")
+
+-- 3. Nút Reset Default
+local defaultBtn = Instance.new("TextButton")
+defaultBtn.Size = UDim2.new(0.95, 0, 0, 30)
+defaultBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+defaultBtn.BorderSizePixel = 0
+defaultBtn.Text = "Khôi phục màu mặc định (Default)"
+defaultBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+defaultBtn.Font = Enum.Font.SourceSansBold
+defaultBtn.TextSize = 14
+defaultBtn.Parent = SlideSetting
+
+defaultBtn.MouseButton1Click:Connect(function()
+    CurrentColors.Background = DEFAULT_COLORS.Background
+    CurrentColors.Border = DEFAULT_COLORS.Border
+    CurrentColors.Text = DEFAULT_COLORS.Text
+    updateGUIColors()
+end)
+
+----------------------------------------------------
+-- THIẾT LẬP SLIDE 1 (STUDS SLIDER & ANTI-STUN)
+----------------------------------------------------
+
+-- Slider Studs (1-20 Studs)
+local studsFrame = Instance.new("Frame")
+studsFrame.Size = UDim2.new(0.95, 0, 0, 45)
+studsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+studsFrame.BorderSizePixel = 1
+studsFrame.BorderColor3 = CurrentColors.Border
+studsFrame.Parent = Slide1
+registerElement(studsFrame, "Border")
+
+local studsLabel = Instance.new("TextLabel")
+studsLabel.Size = UDim2.new(1, 0, 0, 20)
+studsLabel.BackgroundTransparency = 1
+studsLabel.Text = "Khoảng cách: 1 Studs"
+studsLabel.TextColor3 = CurrentColors.Text
+studsLabel.Font = Enum.Font.SourceSans
+studsLabel.TextSize = 14
+studsLabel.Parent = studsFrame
+registerElement(studsLabel, "Text")
+
+local studsBtn = Instance.new("TextButton")
+studsBtn.Size = UDim2.new(0.9, 0, 0, 15)
+studsBtn.Position = UDim2.new(0.05, 0, 0.55, 0)
+studsBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+studsBtn.Text = ""
+studsBtn.Parent = studsFrame
+
+_G.SelectedStuds = 1
+
+studsBtn.MouseButton1Click:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation().X
+    local btnPos = studsBtn.AbsolutePosition.X
+    local btnSize = studsBtn.AbsoluteSize.X
+    local percent = math.clamp((mousePos - btnPos) / btnSize, 0, 1)
+    local val = math.floor(1 + percent * 19)
+    _G.SelectedStuds = val
+    studsLabel.Text = "Khoảng cách: " .. tostring(val) .. " Studs"
+end)
+
+-- Anti-Stun Button
+createKeybindButton(Slide1, "Anti-Stun", function(state)
+    _G.AntiStun = state
+    print("Anti-Stun Status:", state)
+end)
+-- =================================================================
+-- PHẦN 3/3: SLIDE SCRIPT HUB (INFINITE YIELD & DYNAMIC COLLISION)
+-- =================================================================
+
+-- 1. Nút Tải Infinite Yield
+createKeybindButton(SlideScriptHub, "Chạy Infinite Yield", function(state)
+    if state then
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+    end
+end)
+
+-- 2. Nút Bật Dynamic Collision
+createKeybindButton(SlideScriptHub, "Dynamic Collision", function(state)
+    _G.DynamicCollision = state
+    
+    RunService.Stepped:Connect(function()
+        if _G.DynamicCollision and LocalPlayer.Character then
+            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end)
+
+-- Vòng lặp Anti-Stun
+RunService.Heartbeat:Connect(function()
+    if _G.AntiStun and LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            if humanoid:GetState() == Enum.HumanoidStateType.Stunned then
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end
+    end
+end)
+
+-- Hiển thị Slide 1 mặc định khi mở
+showSlide("Slide 1")
+print("Code Chức Năng Loaded Successfully!")
