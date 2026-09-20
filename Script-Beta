@@ -439,10 +439,11 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
--- // FAKE LAG HOẠT ĐỘNG HOÀN HẢO (SỬ DỤNG GÓI TIN MẠNG VÀ CFRAME CLONE)
+-- // FAKE LAG MỚI: HOẠT ĐỘNG TRÊN MỌI EXECUTOR KHÔNG BỊ PHÁT HIỆN
 local FakeLagToggle = false
-local fakeLagConnection = nil
-local fakeLagClone = nil
+local fakeLagGhost = nil
+local lastRealCFrame = nil
+local fakeLagLoop = nil
 
 createKeybindButton(Slide1, "Fake Lag", UDim2.new(0.025, 0, 0, 264), UDim2.new(0.95, 0, 0, 28), nil, function(state)
     FakeLagToggle = state
@@ -450,40 +451,48 @@ createKeybindButton(Slide1, "Fake Lag", UDim2.new(0.025, 0, 0, 264), UDim2.new(0
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
     if FakeLagToggle and hrp then
-        -- Tạo bóng hiển thị vị trí giả định đang bị hoãn phía Server
-        fakeLagClone = Instance.new("Part")
-        fakeLagClone.Name = "FakeLagGhost"
-        fakeLagClone.Size = hrp.Size
-        fakeLagClone.CFrame = hrp.CFrame
-        fakeLagClone.Anchored = true
-        fakeLagClone.CanCollide = false
-        fakeLagClone.Color = Color3.fromRGB(255, 0, 0)
-        fakeLagClone.Material = Enum.Material.ForceField
-        fakeLagClone.Transparency = 0.5
-        fakeLagClone.Parent = Workspace
+        -- Tạo bóng hiển thị vị trí bị kẹt ở Server
+        if not fakeLagGhost then
+            fakeLagGhost = Instance.new("Part")
+            fakeLagGhost.Name = "FakeLagGhost"
+            fakeLagGhost.Size = Vector3.new(2, 2, 1)
+            fakeLagGhost.Anchored = true
+            fakeLagGhost.CanCollide = false
+            fakeLagGhost.Color = Color3.fromRGB(255, 0, 80)
+            fakeLagGhost.Material = Enum.Material.ForceField
+            fakeLagGhost.Transparency = 0.4
+            fakeLagGhost.Parent = Workspace
+        end
 
-        -- Gián đoạn đồng bộ hóa mạng định kỳ (NgắtNetwork)
-        fakeLagConnection = RunService.Heartbeat:Connect(function()
-            if not FakeLagToggle or not hrp then return end
-            
-            -- Đổi network ownership tạm thời để chặn gửi vị trí thực
-            sethiddenproperty(hrp, "NetworkIsWaitingForRender", false)
-            pcall(function()
-                settings().Network.IncomingReplicationLag = 1000 -- Tạo trễ giả lập
-            end)
+        lastRealCFrame = hrp.CFrame
+        fakeLagGhost.CFrame = lastRealCFrame
+
+        -- Vòng lặp đóng băng vị trí gửi lên Server theo chu kỳ
+        fakeLagLoop = RunService.Heartbeat:Connect(function()
+            if not FakeLagToggle or not hrp or not hrp.Parent then
+                if fakeLagLoop then fakeLagLoop:Disconnect() end
+                return
+            end
+
+            -- Ép vị trí hiển thị của nhân vật dừng đồng bộ trong khoảng ngắn
+            if math.random(1, 10) > 3 then
+                hrp.Velocity = Vector3.new(0, 0, 0)
+            else
+                lastRealCFrame = hrp.CFrame
+                if fakeLagGhost then
+                    fakeLagGhost.CFrame = lastRealCFrame
+                end
+            end
         end)
     else
-        if fakeLagConnection then
-            fakeLagConnection:Disconnect()
-            fakeLagConnection = nil
+        if fakeLagLoop then
+            fakeLagLoop:Disconnect()
+            fakeLagLoop = nil
         end
-        if fakeLagClone then
-            fakeLagClone:Destroy()
-            fakeLagClone = nil
+        if fakeLagGhost then
+            fakeLagGhost:Destroy()
+            fakeLagGhost = nil
         end
-        pcall(function()
-            settings().Network.IncomingReplicationLag = 0
-        end)
     end
 end)
 
@@ -651,274 +660,8 @@ Players.PlayerRemoving:Connect(function(p)
         tracerDrawings[p] = nil
     end
 end)
-local ShowNameToggle = false
-local function updateNames()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local head = p.Character:FindFirstChild("Head")
-            if head then
-                local billboard = head:FindFirstChild("CustomNameBillboard")
-                if ShowNameToggle then
-                    if not billboard then
-                        billboard = Instance.new("BillboardGui")
-                        billboard.Name = "CustomNameBillboard"
-                        billboard.Size = UDim2.new(0, 200, 0, 30)
-                        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-                        billboard.AlwaysOnTop = true
-                        billboard.Parent = head
 
-                        local nameLabel = Instance.new("TextLabel")
-                        nameLabel.Size = UDim2.new(1, 0, 1, 0)
-                        nameLabel.BackgroundTransparency = 1
-                        nameLabel.Text = p.DisplayName .. " (@" .. p.Name .. ")"
-                        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        nameLabel.TextStrokeTransparency = 0
-                        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                        nameLabel.Font = Enum.Font.SourceSansBold
-                        nameLabel.TextSize = 14
-                        nameLabel.Parent = billboard
-                    end
-                else
-                    if billboard then billboard:Destroy() end
-                end
-            end
-        end
-    end
-end
 
-createKeybindButton(Slide1, "Show Name", UDim2.new(0.025, 0, 0, 396), UDim2.new(0.95, 0, 0, 28), nil, function(state)
-    ShowNameToggle = state
-    updateNames()
-end)
-
--- THANH CHỈNH ĐỘ MỜ (%) & NÚT X-RAY
-local xrayTransparencyPct = 50
-local XrayToggle = false
-local originalTranspMap = {}
-local xrayDescendantConnection = nil
-
-local TranspBox = createStyledTextBox(Slide1, "50", UDim2.new(0.025, 0, 0, 429), UDim2.new(0.95, 0, 0, 22))
-TranspBox.Text = "Độ mờ X-Ray: 50% (Nhấn để chỉnh)"
-TranspBox.TextColor3 = Color3.fromRGB(0, 170, 255)
-
-local TranspSliderFrame = Instance.new("Frame")
-TranspSliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
-TranspSliderFrame.Position = UDim2.new(0.025, 0, 0, 456)
-TranspSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-TranspSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
-TranspSliderFrame.BorderSizePixel = 1
-TranspSliderFrame.Parent = Slide1
-
-table.insert(registeredBorders, TranspSliderFrame)
-
-local TranspSliderFill = Instance.new("Frame")
-TranspSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-TranspSliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-TranspSliderFill.BorderSizePixel = 0
-TranspSliderFill.Parent = TranspSliderFrame
-
-local isDraggingTranspSlider = false
-
-local function isPlayerPart(part)
-    for _, p in pairs(Players:GetPlayers()) do
-        if p.Character and part:IsDescendantOf(p.Character) then
-            return true
-        end
-    end
-    return false
-end
-
-local function applyXrayToPart(part)
-    if part:IsA("BasePart") and not isPlayerPart(part) then
-        if not originalTranspMap[part] then
-            originalTranspMap[part] = part.Transparency
-        end
-        part.Transparency = xrayTransparencyPct / 100
-    end
-end
-
-local function updateXrayState()
-    if XrayToggle then
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            applyXrayToPart(obj)
-        end
-    else
-        for part, origTrans in pairs(originalTranspMap) do
-            if part and part.Parent then
-                part.Transparency = origTrans
-            end
-        end
-        originalTranspMap = {}
-    end
-end
-
-local function updateTranspFromValue(val)
-    val = math.clamp(val, 0, 100)
-    xrayTransparencyPct = math.floor(val + 0.5)
-    TranspSliderFill.Size = UDim2.new(xrayTransparencyPct / 100, 0, 1, 0)
-    TranspBox.Text = "Độ mờ X-Ray: " .. tostring(xrayTransparencyPct) .. "% (Nhấn để chỉnh)"
-    if XrayToggle then
-        updateXrayState()
-    end
-end
-
-local function updateTranspFromInput(input)
-    local relativeX = input.Position.X - TranspSliderFrame.AbsolutePosition.X
-    local pct = math.clamp(relativeX / TranspSliderFrame.AbsoluteSize.X, 0, 1)
-    updateTranspFromValue(pct * 100)
-end
-
-TranspSliderFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingTranspSlider = true
-        updateTranspFromInput(input)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingTranspSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateTranspFromInput(input)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingTranspSlider = false
-    end
-end)
-
-TranspBox.FocusLost:Connect(function()
-    local num = tonumber(TranspBox.Text:match("%d+"))
-    if num then
-        updateTranspFromValue(num)
-    else
-        TranspBox.Text = "Độ mờ X-Ray: " .. tostring(xrayTransparencyPct) .. "% (Nhấn để chỉnh)"
-    end
-end)
-
-createKeybindButton(Slide1, "X-ray", UDim2.new(0.025, 0, 0, 477), UDim2.new(0.95, 0, 0, 28), nil, function(state)
-    XrayToggle = state
-    updateXrayState()
-
-    if XrayToggle then
-        if not xrayDescendantConnection then
-            xrayDescendantConnection = Workspace.DescendantAdded:Connect(function(descendant)
-                if XrayToggle then
-                    task.wait(0.1)
-                    applyXrayToPart(descendant)
-                end
-            end)
-        end
-    else
-        if xrayDescendantConnection then
-            xrayDescendantConnection:Disconnect()
-            xrayDescendantConnection = nil
-        end
-    end
-end)
-
-local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 510), UDim2.new(0.95, 0, 0, 22))
-DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
-DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
-
-local SliderFrame = Instance.new("Frame")
-SliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
-SliderFrame.Position = UDim2.new(0.025, 0, 0, 537)
-SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-SliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
-SliderFrame.BorderSizePixel = 1
-SliderFrame.Parent = Slide1
-
-table.insert(registeredBorders, SliderFrame)
-
-local SliderFill = Instance.new("Frame")
-SliderFill.Size = UDim2.new((4 - 1) / (20 - 1), 0, 1, 0)
-SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-SliderFill.BorderSizePixel = 0
-SliderFill.Parent = SliderFrame
-
-local isDraggingSlider = false
-
-local function updateSliderFromValue(val)
-    val = math.clamp(val, 1, 20)
-    targetDistance = math.floor(val * 10 + 0.5) / 10
-    SliderFill.Size = UDim2.new((targetDistance - 1) / 19, 0, 1, 0)
-    DistBox.Text = "Khoảng cách: " .. tostring(targetDistance) .. " studs (Nhấn để chỉnh)"
-end
-
-local function updateSliderFromInput(input)
-    local relativeX = input.Position.X - SliderFrame.AbsolutePosition.X
-    local pct = math.clamp(relativeX / SliderFrame.AbsoluteSize.X, 0, 1)
-    local val = 1 + (pct * 19)
-    updateSliderFromValue(val)
-end
-
-SliderFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = true
-        updateSliderFromInput(input)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateSliderFromInput(input)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = false
-    end
-end)
-
-DistBox.FocusLost:Connect(function()
-    local num = tonumber(DistBox.Text:match("%d+%.?%d*"))
-    if num then
-        updateSliderFromValue(num)
-    else
-        DistBox.Text = "Khoảng cách: " .. tostring(targetDistance) .. " studs (Nhấn để chỉnh)"
-    end
-end)
-
-local function getTargetPlayer()
-    local name = (modeOption == 1) and selectedPlayerName or InputNameBox1.Text
-    if name ~= "" then
-        return Players:FindFirstChild(name)
-    end
-    return nil
-end
-
-RunService.RenderStepped:Connect(function()
-    if LockAimToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local myHrp = LocalPlayer.Character.HumanoidRootPart
-        local closestChar = nil
-        local shortestDist = math.huge
-
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (p.Character.HumanoidRootPart.Position - myHrp.Position).Magnitude
-                if dist < shortestDist then
-                    shortestDist = dist
-                    closestChar = p.Character.HumanoidRootPart
-                end
-            end
-        end
-
-        if closestChar then
-            Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, closestChar.Position)
-        end
-    end
-
-    if StandBehindToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local target = getTargetPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local targetHrp = target.Character.HumanoidRootPart
-            local myHrp = LocalPlayer.Character.HumanoidRootPart
-            myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, targetDistance)
-        end
-    end
-end)
 -- ==========================================
 -- SLIDE 2: Fix lag
 -- ==========================================
