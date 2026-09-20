@@ -1199,11 +1199,11 @@ ResetColorBtn.MouseButton1Click:Connect(function()
     )
 end)
 -- ==========================================
--- SLIDE 6: Move (Bổ sung NoClip + Sàn giả & AntiFling)
+-- SLIDE 6: Move (Hoàn chỉnh - Đã sửa lỗi NoClip + AntiFling + Fly + AirWalk + Tốc biến)
 -- ==========================================
 local Slide6 = createSlide("Move")
 
--- 1. NÚT FLY (BAY TỰ DO - GIỮ NGUYÊN)
+-- 1. NÚT FLY (BAY TỰ DO TRÊN MOBILE VÀ PC)
 local flyToggle = false
 local flySpeed = 50
 local flyConnection = nil
@@ -1276,10 +1276,11 @@ createKeybindButton(Slide6, "Fly (Bay tự do)", UDim2.new(0.025, 0, 0, 20), UDi
     end
 end)
 
--- 2. NÚT NOCLIP + TẠO SÀN GIẢ TÀNG HÌNH BÊN DƯỚI
+-- 2. NÚT NOCLIP + SÀN GIẢ TÀNG HÌNH (ĐÃ CỐ ĐỊNH ĐỘ CAO Y - KHÔNG BỊ BAY LÊN)
 local noClipToggle = false
 local noClipConnection = nil
 local fakeFloor = nil
+local fixedY = nil
 
 createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), nil, function(state)
     noClipToggle = state
@@ -1287,12 +1288,15 @@ createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
     if noClipToggle then
-        -- Tạo tấm sàn giả tàng hình
+        if hrp then
+            fixedY = hrp.Position.Y - 3.2
+        end
+
         if not fakeFloor or not fakeFloor.Parent then
             fakeFloor = Instance.new("Part")
             fakeFloor.Name = "CustomInvisibleFloor"
-            fakeFloor.Size = Vector3.new(6, 1, 6)
-            fakeFloor.Transparency = 1 -- Tàng hình hoàn toàn
+            fakeFloor.Size = Vector3.new(8, 1, 8)
+            fakeFloor.Transparency = 1
             fakeFloor.Anchored = true
             fakeFloor.CanCollide = true
             fakeFloor.Parent = Workspace
@@ -1301,18 +1305,20 @@ createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0
         noClipConnection = RunService.Stepped:Connect(function()
             local currentChar = LocalPlayer.Character
             local currentHrp = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+            local humanoid = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
 
             if currentChar and noClipToggle then
-                -- Vô hiệu hóa va chạm toàn bộ cơ thể người chơi
                 for _, part in pairs(currentChar:GetDescendants()) do
                     if part:IsA("BasePart") and part.Name ~= "CustomInvisibleFloor" then
                         part.CanCollide = false
                     end
                 end
 
-                -- Di chuyển sàn giả ngay bên dưới chân người chơi
                 if currentHrp and fakeFloor then
-                    fakeFloor.CFrame = CFrame.new(currentHrp.Position.X, currentHrp.Position.Y - 3.2, currentHrp.Position.Z)
+                    if humanoid and humanoid.Jump then
+                        fixedY = currentHrp.Position.Y - 1.5
+                    end
+                    fakeFloor.CFrame = CFrame.new(currentHrp.Position.X, fixedY, currentHrp.Position.Z)
                 end
             end
         end)
@@ -1325,10 +1331,11 @@ createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0
             fakeFloor:Destroy()
             fakeFloor = nil
         end
+        fixedY = nil
     end
 end)
 
--- 3. NÚT ANTIFLING (TẮT VA CHẠM NGƯỜI CHƠI KHÁC)
+-- 3. NÚT ANTIFLING (TẮT VA CHẠM VỚI NGƯỜI CHƠI KHÁC)
 local antiFlingToggle = false
 local antiFlingConnection = nil
 
@@ -1356,7 +1363,7 @@ createKeybindButton(Slide6, "AntiFling (Chống văng)", UDim2.new(0.025, 0, 0, 
     end
 end)
 
--- 4. NÚT AIR WALK (GIỮ NGUYÊN)
+-- 4. NÚT AIR WALK (ĐI TRÊN KHÔNG BẰNG PHÍM BÀN PHÍM)
 local airWalkToggle = false
 local airWalkSpeed = 50
 local airWalkConnection = nil
@@ -1395,7 +1402,7 @@ createKeybindButton(Slide6, "Đi trên không (Air Walk)", UDim2.new(0.025, 0, 0
     end
 end)
 
--- 5. NÚT TỐC BIẾN (GIỮ NGUYÊN)
+-- 5. NÚT TỐC BIẾN (DỊCH CHUYỂN BẰNG PHÍM R)
 local flashStepToggle = false
 local flashStepDistance = 100
 
@@ -1434,5 +1441,3 @@ end)
 createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 200), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
     flashStepToggle = state
 end)
-
-                
