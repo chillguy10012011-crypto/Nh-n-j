@@ -860,7 +860,7 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
             obj:Destroy()
         end
     end
-end
+end)
 -- ==========================================
 -- SLIDE 5: Setting (Kích thước & Bảng màu GUI)
 -- ==========================================
