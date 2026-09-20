@@ -1199,11 +1199,11 @@ ResetColorBtn.MouseButton1Click:Connect(function()
     )
 end)
 -- ==========================================
--- SLIDE 6: Move (Đã bổ sung tính năng FLY cho Mobile & PC)
+-- SLIDE 6: Move (Bổ sung NoClip + Sàn giả & AntiFling)
 -- ==========================================
 local Slide6 = createSlide("Move")
 
--- 1. NÚT FLY (HỖ TRỢ TỐT CHO CẢ MOBILE VÀ PC)
+-- 1. NÚT FLY (BAY TỰ DO - GIỮ NGUYÊN)
 local flyToggle = false
 local flySpeed = 50
 local flyConnection = nil
@@ -1215,7 +1215,6 @@ createKeybindButton(Slide6, "Fly (Bay tự do)", UDim2.new(0.025, 0, 0, 20), UDi
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 
     if flyToggle and hrp and humanoid then
-        -- Vô hiệu hóa trọng lực bằng BodyVelocity
         local bv = Instance.new("BodyVelocity")
         bv.Name = "FlyVelocity"
         bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
@@ -1238,17 +1237,15 @@ createKeybindButton(Slide6, "Fly (Bay tự do)", UDim2.new(0.025, 0, 0, 20), UDi
             end
 
             local camera = Workspace.CurrentCamera
-            local moveVector = humanoid.MoveDirection -- Nhận tín hiệu từ cần gạt Joystick (Mobile) hoặc W/A/S/D (PC)
+            local moveVector = humanoid.MoveDirection
 
             bg.CFrame = camera.CFrame
 
             if moveVector.Magnitude > 0 then
-                -- Tính toán hướng bay dựa theo hướng nhìn của Camera
                 local cameraCFrame = camera.CFrame
                 local forwardVector = cameraCFrame.LookVector
                 local rightVector = cameraCFrame.RightVector
 
-                -- Tách chuyển động tiến/lùi và trái/phải từ Joystick
                 local dotForward = moveVector:Dot(cameraCFrame.LookVector)
                 local dotRight = moveVector:Dot(cameraCFrame.RightVector)
 
@@ -1279,13 +1276,93 @@ createKeybindButton(Slide6, "Fly (Bay tự do)", UDim2.new(0.025, 0, 0, 20), UDi
     end
 end)
 
--- 2. NÚT AIR WALK (GIỮ NGUYÊN)
+-- 2. NÚT NOCLIP + TẠO SÀN GIẢ TÀNG HÌNH BÊN DƯỚI
+local noClipToggle = false
+local noClipConnection = nil
+local fakeFloor = nil
+
+createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+    noClipToggle = state
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if noClipToggle then
+        -- Tạo tấm sàn giả tàng hình
+        if not fakeFloor or not fakeFloor.Parent then
+            fakeFloor = Instance.new("Part")
+            fakeFloor.Name = "CustomInvisibleFloor"
+            fakeFloor.Size = Vector3.new(6, 1, 6)
+            fakeFloor.Transparency = 1 -- Tàng hình hoàn toàn
+            fakeFloor.Anchored = true
+            fakeFloor.CanCollide = true
+            fakeFloor.Parent = Workspace
+        end
+
+        noClipConnection = RunService.Stepped:Connect(function()
+            local currentChar = LocalPlayer.Character
+            local currentHrp = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+
+            if currentChar and noClipToggle then
+                -- Vô hiệu hóa va chạm toàn bộ cơ thể người chơi
+                for _, part in pairs(currentChar:GetDescendants()) do
+                    if part:IsA("BasePart") and part.Name ~= "CustomInvisibleFloor" then
+                        part.CanCollide = false
+                    end
+                end
+
+                -- Di chuyển sàn giả ngay bên dưới chân người chơi
+                if currentHrp and fakeFloor then
+                    fakeFloor.CFrame = CFrame.new(currentHrp.Position.X, currentHrp.Position.Y - 3.2, currentHrp.Position.Z)
+                end
+            end
+        end)
+    else
+        if noClipConnection then
+            noClipConnection:Disconnect()
+            noClipConnection = nil
+        end
+        if fakeFloor then
+            fakeFloor:Destroy()
+            fakeFloor = nil
+        end
+    end
+end)
+
+-- 3. NÚT ANTIFLING (TẮT VA CHẠM NGƯỜI CHƠI KHÁC)
+local antiFlingToggle = false
+local antiFlingConnection = nil
+
+createKeybindButton(Slide6, "AntiFling (Chống văng)", UDim2.new(0.025, 0, 0, 110), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+    antiFlingToggle = state
+
+    if antiFlingToggle then
+        antiFlingConnection = RunService.Stepped:Connect(function()
+            if not antiFlingToggle then return end
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    for _, part in pairs(player.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        if antiFlingConnection then
+            antiFlingConnection:Disconnect()
+            antiFlingConnection = nil
+        end
+    end
+end)
+
+-- 4. NÚT AIR WALK (GIỮ NGUYÊN)
 local airWalkToggle = false
 local airWalkSpeed = 50
 local airWalkConnection = nil
 local airWalkBv = nil
 
-createKeybindButton(Slide6, "Đi trên không (Air Walk)", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+createKeybindButton(Slide6, "Đi trên không (Air Walk)", UDim2.new(0.025, 0, 0, 155), UDim2.new(0.95, 0, 0, 35), nil, function(state)
     airWalkToggle = state
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1318,7 +1395,7 @@ createKeybindButton(Slide6, "Đi trên không (Air Walk)", UDim2.new(0.025, 0, 0
     end
 end)
 
--- 3. NÚT TỐC BIẾN (GIỮ NGUYÊN)
+-- 5. NÚT TỐC BIẾN (GIỮ NGUYÊN)
 local flashStepToggle = false
 local flashStepDistance = 100
 
@@ -1354,7 +1431,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 110), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
+createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 200), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
     flashStepToggle = state
 end)
 
+                
