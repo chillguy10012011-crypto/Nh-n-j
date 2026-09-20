@@ -36,7 +36,7 @@ local function enableDragging(frame, dragHandle)
     end)
 
     dragHandle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
     end)
@@ -489,11 +489,7 @@ createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(
     end
 end)
 
--- ==========================================
--- NÚT MỚI: ESP, TRACER, SHOW NAME
--- ==========================================
-
--- 1. NÚT ESP
+-- ESP, TRACER, SHOW NAME
 local EspToggle = false
 local function updateESP()
     for _, p in pairs(Players:GetPlayers()) do
@@ -507,10 +503,10 @@ local function updateESP()
                     highlight.Parent = p.Character
                 end
                 if p == LocalPlayer then
-                    highlight.FillColor = Color3.fromRGB(0, 170, 255) -- Xanh biển cho bản thân
+                    highlight.FillColor = Color3.fromRGB(0, 170, 255)
                     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                 else
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Đỏ cho người chơi khác
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
                     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                 end
             else
@@ -525,7 +521,6 @@ createKeybindButton(Slide1, "Esp", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 
     updateESP()
 end)
 
--- 2. NÚT TRACER + ESP BOX (DÙNG DRAWING LIB TỐI ƯU)
 local TracerToggle = false
 local tracerDrawings = {}
 
@@ -539,9 +534,7 @@ end
 
 createKeybindButton(Slide1, "Tracer", UDim2.new(0.025, 0, 0, 330), UDim2.new(0.95, 0, 0, 28), nil, function(state)
     TracerToggle = state
-    if not TracerToggle then
-        clearTracers()
-    end
+    if not TracerToggle then clearTracers() end
 end)
 
 RunService.RenderStepped:Connect(function()
@@ -549,7 +542,7 @@ RunService.RenderStepped:Connect(function()
 
     local Camera = Workspace.CurrentCamera
     local viewportSize = Camera.ViewportSize
-    local shiftLockPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2) -- Tâm màn hình / Shift Lock
+    local shiftLockPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
 
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
@@ -576,12 +569,10 @@ RunService.RenderStepped:Connect(function()
                 local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 
                 if onScreen then
-                    -- Vẽ Line từ tâm tới target
                     drawGroup.Line.From = shiftLockPos
                     drawGroup.Line.To = Vector2.new(hrpPos.X, hrpPos.Y)
                     drawGroup.Line.Visible = true
 
-                    -- Tính kích thước Box 2D linh hoạt theo khoảng cách
                     local head = char:FindFirstChild("Head")
                     local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or hrpPos
                     local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
@@ -612,9 +603,7 @@ Players.PlayerRemoving:Connect(function(p)
     end
 end)
 
--- 3. NÚT SHOW NAME
 local ShowNameToggle = false
-
 local function updateNames()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
@@ -654,33 +643,139 @@ createKeybindButton(Slide1, "Show Name", UDim2.new(0.025, 0, 0, 363), UDim2.new(
     updateNames()
 end)
 
--- TỰ ĐỘNG TẢI ESP / NAME KHI NGUỜI CHƠI RESPAWN HOẶC VÀO GAME
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        if EspToggle then updateESP() end
-        if ShowNameToggle then updateNames() end
-    end)
-end)
+-- THANH CHỈNH ĐỘ MỜ (%) & NÚT X-RAY
+local xrayTransparencyPct = 50
+local XrayToggle = false
+local originalTranspMap = {}
+local xrayDescendantConnection = nil
 
-for _, p in pairs(Players:GetPlayers()) do
-    p.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        if EspToggle then updateESP() end
-        if ShowNameToggle then updateNames() end
-    end)
+local TranspBox = createStyledTextBox(Slide1, "50", UDim2.new(0.025, 0, 0, 396), UDim2.new(0.95, 0, 0, 22))
+TranspBox.Text = "Độ mờ X-Ray: 50% (Nhấn để chỉnh)"
+TranspBox.TextColor3 = Color3.fromRGB(0, 170, 255)
+
+local TranspSliderFrame = Instance.new("Frame")
+TranspSliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
+TranspSliderFrame.Position = UDim2.new(0.025, 0, 0, 423)
+TranspSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TranspSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+TranspSliderFrame.BorderSizePixel = 1
+TranspSliderFrame.Parent = Slide1
+
+table.insert(registeredBorders, TranspSliderFrame)
+
+local TranspSliderFill = Instance.new("Frame")
+TranspSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+TranspSliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+TranspSliderFill.BorderSizePixel = 0
+TranspSliderFill.Parent = TranspSliderFrame
+
+local isDraggingTranspSlider = false
+
+local function isPlayerPart(part)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and part:IsDescendantOf(p.Character) then
+            return true
+        end
+    end
+    return false
 end
 
--- ==========================================
--- ĐOẠN SLIDER & CÁC CHỨC NĂNG CŨ
--- ==========================================
-local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 396), UDim2.new(0.95, 0, 0, 22))
+local function applyXrayToPart(part)
+    if part:IsA("BasePart") and not isPlayerPart(part) then
+        if not originalTranspMap[part] then
+            originalTranspMap[part] = part.Transparency
+        end
+        part.Transparency = xrayTransparencyPct / 100
+    end
+end
+
+local function updateXrayState()
+    if XrayToggle then
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            applyXrayToPart(obj)
+        end
+    else
+        for part, origTrans in pairs(originalTranspMap) do
+            if part and part.Parent then
+                part.Transparency = origTrans
+            end
+        end
+        originalTranspMap = {}
+    end
+end
+
+local function updateTranspFromValue(val)
+    val = math.clamp(val, 0, 100)
+    xrayTransparencyPct = math.floor(val + 0.5)
+    TranspSliderFill.Size = UDim2.new(xrayTransparencyPct / 100, 0, 1, 0)
+    TranspBox.Text = "Độ mờ X-Ray: " .. tostring(xrayTransparencyPct) .. "% (Nhấn để chỉnh)"
+    if XrayToggle then
+        updateXrayState()
+    end
+end
+
+local function updateTranspFromInput(input)
+    local relativeX = input.Position.X - TranspSliderFrame.AbsolutePosition.X
+    local pct = math.clamp(relativeX / TranspSliderFrame.AbsoluteSize.X, 0, 1)
+    updateTranspFromValue(pct * 100)
+end
+
+TranspSliderFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingTranspSlider = true
+        updateTranspFromInput(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingTranspSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateTranspFromInput(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingTranspSlider = false
+    end
+end)
+
+TranspBox.FocusLost:Connect(function()
+    local num = tonumber(TranspBox.Text:match("%d+"))
+    if num then
+        updateTranspFromValue(num)
+    else
+        TranspBox.Text = "Độ mờ X-Ray: " .. tostring(xrayTransparencyPct) .. "% (Nhấn để chỉnh)"
+    end
+end)
+
+createKeybindButton(Slide1, "X-ray", UDim2.new(0.025, 0, 0, 444), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    XrayToggle = state
+    updateXrayState()
+
+    if XrayToggle then
+        if not xrayDescendantConnection then
+            xrayDescendantConnection = Workspace.DescendantAdded:Connect(function(descendant)
+                if XrayToggle then
+                    task.wait(0.1)
+                    applyXrayToPart(descendant)
+                end
+            end)
+        end
+    else
+        if xrayDescendantConnection then
+            xrayDescendantConnection:Disconnect()
+            xrayDescendantConnection = nil
+        end
+    end
+end)
+
+local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 477), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
 
 local SliderFrame = Instance.new("Frame")
 SliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
-SliderFrame.Position = UDim2.new(0.025, 0, 0, 423)
+SliderFrame.Position = UDim2.new(0.025, 0, 0, 504)
 SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 SliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 SliderFrame.BorderSizePixel = 1
@@ -776,7 +871,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
 -- ==========================================
 -- SLIDE 2: Fix lag
 -- ==========================================
@@ -862,7 +956,7 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
     end
 end)
 -- ==========================================
--- SLIDE 5: Setting (Kích thước & Bảng màu GUI)
+-- SLIDE 5: Setting (Thêm Nút Đổi Style GUI theo Ảnh)
 -- ==========================================
 local Slide5 = createSlide("Setting")
 
@@ -933,7 +1027,57 @@ ScaleLbl.FocusLost:Connect(function()
     end
 end)
 
--- Danh sách màu sắc cho Palette chọn
+-- // BỔ SUNG: NÚT CHỌN PRESET STYLE GUI (ẢNH 1, ẢNH 2 & DEFAULT)
+local StylePresetTitle = Instance.new("TextLabel")
+StylePresetTitle.Size = UDim2.new(0.95, 0, 0, 18)
+StylePresetTitle.Position = UDim2.new(0.025, 0, 0, 60)
+StylePresetTitle.BackgroundTransparency = 1
+StylePresetTitle.Text = "Chọn Style GUI nhanh:"
+StylePresetTitle.TextColor3 = Color3.fromRGB(0, 170, 255)
+StylePresetTitle.Font = Enum.Font.SourceSansBold
+StylePresetTitle.TextSize = 13
+StylePresetTitle.TextXAlignment = Enum.TextXAlignment.Left
+StylePresetTitle.Parent = Slide5
+
+table.insert(registeredTexts, StylePresetTitle)
+
+local Style1Btn = createStyledButton(Slide5, "Style Ruby (Ảnh 1)", UDim2.new(0.025, 0, 0, 82), UDim2.new(0.95, 0, 0, 28))
+Style1Btn.BackgroundColor3 = Color3.fromRGB(120, 20, 35)
+
+local Style2Btn = createStyledButton(Slide5, "Style Sci-Fi Blue (Ảnh 2)", UDim2.new(0.025, 0, 0, 115), UDim2.new(0.95, 0, 0, 28))
+Style2Btn.BackgroundColor3 = Color3.fromRGB(15, 60, 90)
+
+local DefaultStyleBtn = createStyledButton(Slide5, "Default (Mặc định)", UDim2.new(0.025, 0, 0, 148), UDim2.new(0.95, 0, 0, 28))
+DefaultStyleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+-- Sự kiện nhấn nút Style 1 (Ruby - Ảnh 1)
+Style1Btn.MouseButton1Click:Connect(function()
+    applyTheme(
+        Color3.fromRGB(18, 10, 14),   -- Màu nền tối Ruby
+        Color3.fromRGB(220, 40, 70),   -- Màu viền Đỏ Ruby
+        Color3.fromRGB(255, 230, 235)  -- Màu chữ sáng hồng
+    )
+end)
+
+-- Sự kiện nhấn nút Style 2 (Sci-Fi Blue - Ảnh 2)
+Style2Btn.MouseButton1Click:Connect(function()
+    applyTheme(
+        Color3.fromRGB(10, 18, 28),   -- Màu nền Xanh Đen Sci-Fi
+        Color3.fromRGB(0, 215, 255),   -- Màu viền Xanh Neon / Cyan
+        Color3.fromRGB(220, 250, 255)  -- Màu chữ xanh nhạt
+    )
+end)
+
+-- Sự kiện nhấn nút Default
+DefaultStyleBtn.MouseButton1Click:Connect(function()
+    applyTheme(
+        Color3.fromRGB(35, 35, 35),   -- Nền xám đen mặc định
+        Color3.fromRGB(0, 170, 255),  -- Viền xanh lam mặc định
+        Color3.fromRGB(255, 255, 255) -- Chữ trắng
+    )
+end)
+
+-- Danh sách màu sắc cho Palette chọn thủ công
 local colorList = {
     Color3.fromRGB(35, 35, 35), Color3.fromRGB(20, 20, 20), Color3.fromRGB(50, 50, 50),
     Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 85, 85), Color3.fromRGB(85, 255, 85),
@@ -981,27 +1125,27 @@ local function createColorPaletteSection(titleText, posY, onSelectColor)
 end
 
 -- Bảng 1: Chọn màu nền GUI
-createColorPaletteSection("1. Chọn màu nền GUI:", 60, function(color)
+createColorPaletteSection("1. Chọn màu nền GUI:", 185, function(color)
     applyTheme(color, nil, nil)
 end)
 
 -- Bảng 2: Chọn màu viền GUI
-createColorPaletteSection("2. Chọn màu viền GUI:", 120, function(color)
+createColorPaletteSection("2. Chọn màu viền GUI:", 245, function(color)
     applyTheme(nil, color, nil)
 end)
 
 -- Bảng 3: Chọn màu chữ
-createColorPaletteSection("3. Chọn màu chữ GUI:", 180, function(color)
+createColorPaletteSection("3. Chọn màu chữ GUI:", 305, function(color)
     applyTheme(nil, nil, color)
 end)
 
 -- Nút Khôi Phục Màu Mặc Định
-local ResetColorBtn = createStyledButton(Slide5, "Khôi phục màu mặc định", UDim2.new(0.025, 0, 0, 240), UDim2.new(0.95, 0, 0, 28))
+local ResetColorBtn = createStyledButton(Slide5, "Khôi phục màu mặc định", UDim2.new(0.025, 0, 0, 365), UDim2.new(0.95, 0, 0, 28))
 ResetColorBtn.MouseButton1Click:Connect(function()
     applyTheme(
-        Color3.fromRGB(35, 35, 35),   -- Màu nền mặc định
-        Color3.fromRGB(0, 170, 255),  -- Màu viền xanh lam mặc định
-        Color3.fromRGB(255, 255, 255) -- Màu chữ trắng mặc định
+        Color3.fromRGB(35, 35, 35),
+        Color3.fromRGB(0, 170, 255),
+        Color3.fromRGB(255, 255, 255)
     )
 end)
 
