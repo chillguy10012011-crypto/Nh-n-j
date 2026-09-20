@@ -1149,58 +1149,126 @@ ResetColorBtn.MouseButton1Click:Connect(function()
     )
 end)
 -- ==========================================
--- SLIDE 6: Move (Đã tối ưu cho cả Điện thoại & PC)
+-- SLIDE 6: Move (Đã bổ sung tính năng FLY cho Mobile & PC)
 -- ==========================================
 local Slide6 = createSlide("Move")
 
--- 1. NÚT AIR WALK (TỐI ƯU CHO MOBILE & PC)
+-- 1. NÚT FLY (HỖ TRỢ TỐT CHO CẢ MOBILE VÀ PC)
 local flyToggle = false
 local flySpeed = 50
 local flyConnection = nil
-local bv = nil
 
-createKeybindButton(Slide6, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+createKeybindButton(Slide6, "Fly (Bay tự do)", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
     flyToggle = state
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 
     if flyToggle and hrp and humanoid then
-        -- Tạo BodyVelocity để giữ nhân vật trên không
-        bv = Instance.new("BodyVelocity")
-        bv.Name = "AirWalkVelocity"
-        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        -- Vô hiệu hóa trọng lực bằng BodyVelocity
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "FlyVelocity"
+        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
         bv.Velocity = Vector3.zero
         bv.Parent = hrp
 
+        local bg = Instance.new("BodyGyro")
+        bg.Name = "FlyGyro"
+        bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        bg.P = 9e4
+        bg.CFrame = hrp.CFrame
+        bg.Parent = hrp
+
+        humanoid.PlatformStand = true
+
         flyConnection = RunService.RenderStepped:Connect(function()
-            local currentChar = LocalPlayer.Character
-            local currentHrp = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
-            local currentHumanoid = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
+            if not flyToggle or not hrp or not hrp.Parent then
+                if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+                return
+            end
 
-            if currentHrp and currentHumanoid and bv then
-                -- Lấy hướng di chuyển trực tiếp từ Joystick Mobile hoặc phím WASD PC
-                local moveDir = currentHumanoid.MoveDirection
-                local verticalDir = 0
+            local camera = Workspace.CurrentCamera
+            local moveVector = humanoid.MoveDirection -- Nhận tín hiệu từ cần gạt Joystick (Mobile) hoặc W/A/S/D (PC)
 
-                -- Hỗ trợ bay lên / xuống bằng phím bấm PC (nếu có)
-                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
-                    verticalDir = 1 
-                elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then 
-                    verticalDir = -1 
+            bg.CFrame = camera.CFrame
+
+            if moveVector.Magnitude > 0 then
+                -- Tính toán hướng bay dựa theo hướng nhìn của Camera
+                local cameraCFrame = camera.CFrame
+                local forwardVector = cameraCFrame.LookVector
+                local rightVector = cameraCFrame.RightVector
+
+                -- Tách chuyển động tiến/lùi và trái/phải từ Joystick
+                local dotForward = moveVector:Dot(cameraCFrame.LookVector)
+                local dotRight = moveVector:Dot(cameraCFrame.RightVector)
+
+                local flyDirection = (forwardVector * dotForward) + (rightVector * dotRight)
+                if flyDirection.Magnitude > 0 then
+                    flyDirection = flyDirection.Unit
                 end
 
-                -- Tính toán vận tốc di chuyển kết hợp cả hướng ngang (MoveDirection) và hướng đứng
-                bv.Velocity = (moveDir * flySpeed) + Vector3.new(0, verticalDir * flySpeed, 0)
+                bv.Velocity = flyDirection * flySpeed
+            else
+                bv.Velocity = Vector3.zero
             end
         end)
     else
-        if flyConnection then flyConnection:Disconnect() flyConnection = nil end
-        if bv then bv:Destroy() bv = nil end
+        if flyConnection then
+            flyConnection:Disconnect()
+            flyConnection = nil
+        end
+        if hrp then
+            local oldBv = hrp:FindFirstChild("FlyVelocity")
+            local oldBg = hrp:FindFirstChild("FlyGyro")
+            if oldBv then oldBv:Destroy() end
+            if oldBg then oldBg:Destroy() end
+        end
+        if humanoid then
+            humanoid.PlatformStand = false
+        end
     end
 end)
 
--- 2. NÚT TỐC BIẾN (FLASH STEP)
+-- 2. NÚT AIR WALK (GIỮ NGUYÊN)
+local airWalkToggle = false
+local airWalkSpeed = 50
+local airWalkConnection = nil
+local airWalkBv = nil
+
+createKeybindButton(Slide6, "Đi trên không (Air Walk)", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+    airWalkToggle = state
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if airWalkToggle and hrp then
+        airWalkBv = Instance.new("BodyVelocity")
+        airWalkBv.Name = "AirWalkVelocity"
+        airWalkBv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        airWalkBv.Velocity = Vector3.zero
+        airWalkBv.Parent = hrp
+
+        airWalkConnection = RunService.RenderStepped:Connect(function()
+            if hrp and airWalkBv then
+                local cam = Workspace.CurrentCamera
+                local moveDir = Vector3.zero
+
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+                airWalkBv.Velocity = moveDir * airWalkSpeed
+            end
+        end)
+    else
+        if airWalkConnection then airWalkConnection:Disconnect() airWalkConnection = nil end
+        if airWalkBv then airWalkBv:Destroy() airWalkBv = nil end
+    end
+end)
+
+-- 3. NÚT TỐC BIẾN (GIỮ NGUYÊN)
 local flashStepToggle = false
 local flashStepDistance = 100
 
@@ -1236,6 +1304,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
+createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 110), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
     flashStepToggle = state
 end)
+
