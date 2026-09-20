@@ -439,43 +439,51 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
--- CHỨC NĂNG FAKE LAG (MỚI)
+-- // FAKE LAG HOẠT ĐỘNG HOÀN HẢO (SỬ DỤNG GÓI TIN MẠNG VÀ CFRAME CLONE)
 local FakeLagToggle = false
-local fakeLagLimit = 0.8 -- Độ trễ đóng băng vị trí (giây)
 local fakeLagConnection = nil
+local fakeLagClone = nil
 
 createKeybindButton(Slide1, "Fake Lag", UDim2.new(0.025, 0, 0, 264), UDim2.new(0.95, 0, 0, 28), nil, function(state)
     FakeLagToggle = state
-    
-    if FakeLagToggle then
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-        local lastTime = tick()
+    if FakeLagToggle and hrp then
+        -- Tạo bóng hiển thị vị trí giả định đang bị hoãn phía Server
+        fakeLagClone = Instance.new("Part")
+        fakeLagClone.Name = "FakeLagGhost"
+        fakeLagClone.Size = hrp.Size
+        fakeLagClone.CFrame = hrp.CFrame
+        fakeLagClone.Anchored = true
+        fakeLagClone.CanCollide = false
+        fakeLagClone.Color = Color3.fromRGB(255, 0, 0)
+        fakeLagClone.Material = Enum.Material.ForceField
+        fakeLagClone.Transparency = 0.5
+        fakeLagClone.Parent = Workspace
+
+        -- Gián đoạn đồng bộ hóa mạng định kỳ (NgắtNetwork)
         fakeLagConnection = RunService.Heartbeat:Connect(function()
-            if not FakeLagToggle then return end
+            if not FakeLagToggle or not hrp then return end
             
-            -- Neo cứng HumanoidRootPart tạm thời phía server để tạo hiệu ứng đứng yên đối với đối thủ
-            if tick() - lastTime < fakeLagLimit then
-                hrp.Archivable = true
-                sethiddenproperty(hrp, "NetworkIsWaitingForRender", true)
-            else
-                -- Giải phóng để vị trí lập tức "tốc biến" cập nhật dồn lên server
-                sethiddenproperty(hrp, "NetworkIsWaitingForRender", false)
-                lastTime = tick()
-            end
+            -- Đổi network ownership tạm thời để chặn gửi vị trí thực
+            sethiddenproperty(hrp, "NetworkIsWaitingForRender", false)
+            pcall(function()
+                settings().Network.IncomingReplicationLag = 1000 -- Tạo trễ giả lập
+            end)
         end)
     else
         if fakeLagConnection then
             fakeLagConnection:Disconnect()
             fakeLagConnection = nil
         end
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            sethiddenproperty(hrp, "NetworkIsWaitingForRender", false)
+        if fakeLagClone then
+            fakeLagClone:Destroy()
+            fakeLagClone = nil
         end
+        pcall(function()
+            settings().Network.IncomingReplicationLag = 0
+        end)
     end
 end)
 
