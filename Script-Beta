@@ -251,7 +251,7 @@ local function createStyledTextBox(parent, placeholder, pos, size)
     return box
 end
 
--- // HÀM TẠO NÚT BẬT/TẮT TÍCH HỢP KEYBIND (METEOR CLIENT STYLE)
+-- // HÀM TẠO NÚT BẬT/TẮT TÍCH HỢP KEYBIND
 local function createKeybindButton(parent, defaultText, pos, size, defaultKey, onToggleCallback)
     size = size or UDim2.new(0.95, 0, 0, 30)
     
@@ -438,7 +438,7 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
--- LOGIC BẬT/TẮT ANTI-STUN
+-- ANTI-STUN
 local AntiStunToggle = false
 local antiStunConnection = nil
 
@@ -489,19 +489,298 @@ createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(
     end
 end)
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    if AntiStunToggle then
-        updateAntiStunState(char)
+-- ESP, TRACER, SHOW NAME
+local EspToggle = false
+local function updateESP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character then
+            local highlight = p.Character:FindFirstChild("CustomESPHighlight")
+            if EspToggle then
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "CustomESPHighlight"
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    highlight.Parent = p.Character
+                end
+                if p == LocalPlayer then
+                    highlight.FillColor = Color3.fromRGB(0, 170, 255)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                else
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                end
+            else
+                if highlight then highlight:Destroy() end
+            end
+        end
+    end
+end
+
+createKeybindButton(Slide1, "Esp", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    EspToggle = state
+    updateESP()
+end)
+
+local TracerToggle = false
+local tracerDrawings = {}
+
+local function clearTracers()
+    for _, drawGroup in pairs(tracerDrawings) do
+        if drawGroup.Line then drawGroup.Line:Remove() end
+        if drawGroup.Box then drawGroup.Box:Remove() end
+    end
+    tracerDrawings = {}
+end
+
+createKeybindButton(Slide1, "Tracer", UDim2.new(0.025, 0, 0, 330), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    TracerToggle = state
+    if not TracerToggle then clearTracers() end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not TracerToggle then return end
+
+    local Camera = Workspace.CurrentCamera
+    local viewportSize = Camera.ViewportSize
+    local shiftLockPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            if not tracerDrawings[p] then
+                local line = Drawing.new("Line")
+                line.Color = Color3.fromRGB(255, 0, 0)
+                line.Thickness = 1.5
+                line.Transparency = 1
+
+                local box = Drawing.new("Square")
+                box.Color = Color3.fromRGB(255, 0, 0)
+                box.Thickness = 1.5
+                box.Filled = false
+                box.Transparency = 1
+
+                tracerDrawings[p] = {Line = line, Box = box}
+            end
+
+            local drawGroup = tracerDrawings[p]
+            local char = p.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+            if hrp and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
+                local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    drawGroup.Line.From = shiftLockPos
+                    drawGroup.Line.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                    drawGroup.Line.Visible = true
+
+                    local head = char:FindFirstChild("Head")
+                    local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or hrpPos
+                    local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+                    local boxHeight = math.abs(headPos.Y - legPos.Y)
+                    local boxWidth = boxHeight * 0.65
+
+                    drawGroup.Box.Size = Vector2.new(boxWidth, boxHeight)
+                    drawGroup.Box.Position = Vector2.new(hrpPos.X - boxWidth / 2, hrpPos.Y - boxHeight / 2)
+                    drawGroup.Box.Visible = true
+                else
+                    drawGroup.Line.Visible = false
+                    drawGroup.Box.Visible = false
+                end
+            else
+                drawGroup.Line.Visible = false
+                drawGroup.Box.Visible = false
+            end
+        end
     end
 end)
 
-local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 0, 0, 22))
+Players.PlayerRemoving:Connect(function(p)
+    if tracerDrawings[p] then
+        if tracerDrawings[p].Line then tracerDrawings[p].Line:Remove() end
+        if tracerDrawings[p].Box then tracerDrawings[p].Box:Remove() end
+        tracerDrawings[p] = nil
+    end
+end)
+
+local ShowNameToggle = false
+local function updateNames()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            if head then
+                local billboard = head:FindFirstChild("CustomNameBillboard")
+                if ShowNameToggle then
+                    if not billboard then
+                        billboard = Instance.new("BillboardGui")
+                        billboard.Name = "CustomNameBillboard"
+                        billboard.Size = UDim2.new(0, 200, 0, 30)
+                        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                        billboard.AlwaysOnTop = true
+                        billboard.Parent = head
+
+                        local nameLabel = Instance.new("TextLabel")
+                        nameLabel.Size = UDim2.new(1, 0, 1, 0)
+                        nameLabel.BackgroundTransparency = 1
+                        nameLabel.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+                        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        nameLabel.TextStrokeTransparency = 0
+                        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                        nameLabel.Font = Enum.Font.SourceSansBold
+                        nameLabel.TextSize = 14
+                        nameLabel.Parent = billboard
+                    end
+                else
+                    if billboard then billboard:Destroy() end
+                end
+            end
+        end
+    end
+end
+
+createKeybindButton(Slide1, "Show Name", UDim2.new(0.025, 0, 0, 363), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    ShowNameToggle = state
+    updateNames()
+end)
+
+-- ==========================================
+-- BỔ SUNG MỚI: THANH CHỈNH ĐỘ MỜ (%) & NÚT X-RAY
+-- ==========================================
+local xrayTransparencyPct = 50 -- Mặc định 50%
+local XrayToggle = false
+local originalTranspMap = {} -- Lưu độ mờ gốc của Part
+local xrayDescendantConnection = nil
+
+local TranspBox = createStyledTextBox(Slide1, "50", UDim2.new(0.025, 0, 0, 396), UDim2.new(0.95, 0, 0, 22))
+TranspBox.Text = "Độ mờ X-Ray: 50% (Nhấn để chỉnh)"
+TranspBox.TextColor3 = Color3.fromRGB(0, 170, 255)
+
+local TranspSliderFrame = Instance.new("Frame")
+TranspSliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
+TranspSliderFrame.Position = UDim2.new(0.025, 0, 0, 423)
+TranspSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TranspSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+TranspSliderFrame.BorderSizePixel = 1
+TranspSliderFrame.Parent = Slide1
+
+table.insert(registeredBorders, TranspSliderFrame)
+
+local TranspSliderFill = Instance.new("Frame")
+TranspSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+TranspSliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+TranspSliderFill.BorderSizePixel = 0
+TranspSliderFill.Parent = TranspSliderFrame
+
+local isDraggingTranspSlider = false
+
+local function isPlayerPart(part)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and part:IsDescendantOf(p.Character) then
+            return true
+        end
+    end
+    return false
+end
+
+local function applyXrayToPart(part)
+    if part:IsA("BasePart") and not isPlayerPart(part) then
+        if not originalTranspMap[part] then
+            originalTranspMap[part] = part.Transparency
+        end
+        part.Transparency = xrayTransparencyPct / 100
+    end
+end
+
+local function updateXrayState()
+    if XrayToggle then
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            applyXrayToPart(obj)
+        end
+    else
+        for part, origTrans in pairs(originalTranspMap) do
+            if part and part.Parent then
+                part.Transparency = origTrans
+            end
+        end
+        originalTranspMap = {}
+    end
+end
+
+local function updateTranspFromValue(val)
+    val = math.clamp(val, 0, 100)
+    xrayTransparencyPct = math.floor(val + 0.5)
+    TranspSliderFill.Size = UDim2.new(xrayTransparencyPct / 100, 0, 1, 0)
+    TranspBox.Text = "Độ mờ X-Ray: " .. tostring(xrayTransparencyPct) .. "% (Nhấn để chỉnh)"
+    if XrayToggle then
+        updateXrayState()
+    end
+end
+
+local function updateTranspFromInput(input)
+    local relativeX = input.Position.X - TranspSliderFrame.AbsolutePosition.X
+    local pct = math.clamp(relativeX / TranspSliderFrame.AbsoluteSize.X, 0, 1)
+    updateTranspFromValue(pct * 100)
+end
+
+TranspSliderFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingTranspSlider = true
+        updateTranspFromInput(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingTranspSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateTranspFromInput(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingTranspSlider = false
+    end
+end)
+
+TranspBox.FocusLost:Connect(function()
+    local num = tonumber(TranspBox.Text:match("%d+"))
+    if num then
+        updateTranspFromValue(num)
+    else
+        TranspBox.Text = "Độ mờ X-Ray: " .. tostring(xrayTransparencyPct) .. "% (Nhấn để chỉnh)"
+    end
+end)
+
+createKeybindButton(Slide1, "X-ray", UDim2.new(0.025, 0, 0, 444), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    XrayToggle = state
+    updateXrayState()
+
+    if XrayToggle then
+        if not xrayDescendantConnection then
+            xrayDescendantConnection = Workspace.DescendantAdded:Connect(function(descendant)
+                if XrayToggle then
+                    task.wait(0.1)
+                    applyXrayToPart(descendant)
+                end
+            end)
+        end
+    else
+        if xrayDescendantConnection then
+            xrayDescendantConnection:Disconnect()
+            xrayDescendantConnection = nil
+        end
+    end
+end)
+
+-- ==========================================
+-- ĐOẠN SLIDER & CÁC CHỨC NĂNG CŨ (LÙI POSITION NHẸ)
+-- ==========================================
+local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 477), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
 
 local SliderFrame = Instance.new("Frame")
 SliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
-SliderFrame.Position = UDim2.new(0.025, 0, 0, 324)
+SliderFrame.Position = UDim2.new(0.025, 0, 0, 504)
 SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 SliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 SliderFrame.BorderSizePixel = 1
@@ -827,7 +1106,7 @@ ResetColorBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 6: Move (TÊN MỚI)
+-- SLIDE 6: Move
 -- ==========================================
 local Slide6 = createSlide("Move")
 
