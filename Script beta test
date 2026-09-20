@@ -251,7 +251,7 @@ local function createStyledTextBox(parent, placeholder, pos, size)
     return box
 end
 
--- // HÀM TẠO NÚT BẬT/TẮT TÍCH HỢP KEYBIND (METEOR CLIENT STYLE)
+-- // HÀM TẠO NÚT BẬT/TẮT TÍCH HỢP KEYBIND
 local function createKeybindButton(parent, defaultText, pos, size, defaultKey, onToggleCallback)
     size = size or UDim2.new(0.95, 0, 0, 30)
     
@@ -438,7 +438,7 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
--- LOGIC BẬT/TẮT ANTI-STUN
+-- ANTI-STUN
 local AntiStunToggle = false
 local antiStunConnection = nil
 
@@ -489,19 +489,198 @@ createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(
     end
 end)
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    if AntiStunToggle then
-        updateAntiStunState(char)
+-- ==========================================
+-- NÚT MỚI: ESP, TRACER, SHOW NAME
+-- ==========================================
+
+-- 1. NÚT ESP
+local EspToggle = false
+local function updateESP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character then
+            local highlight = p.Character:FindFirstChild("CustomESPHighlight")
+            if EspToggle then
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "CustomESPHighlight"
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    highlight.Parent = p.Character
+                end
+                if p == LocalPlayer then
+                    highlight.FillColor = Color3.fromRGB(0, 170, 255) -- Xanh biển cho bản thân
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                else
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Đỏ cho người chơi khác
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                end
+            else
+                if highlight then highlight:Destroy() end
+            end
+        end
+    end
+end
+
+createKeybindButton(Slide1, "Esp", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    EspToggle = state
+    updateESP()
+end)
+
+-- 2. NÚT TRACER + ESP BOX (DÙNG DRAWING LIB TỐI ƯU)
+local TracerToggle = false
+local tracerDrawings = {}
+
+local function clearTracers()
+    for _, drawGroup in pairs(tracerDrawings) do
+        if drawGroup.Line then drawGroup.Line:Remove() end
+        if drawGroup.Box then drawGroup.Box:Remove() end
+    end
+    tracerDrawings = {}
+end
+
+createKeybindButton(Slide1, "Tracer", UDim2.new(0.025, 0, 0, 330), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    TracerToggle = state
+    if not TracerToggle then
+        clearTracers()
     end
 end)
 
-local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 0, 0, 22))
+RunService.RenderStepped:Connect(function()
+    if not TracerToggle then return end
+
+    local Camera = Workspace.CurrentCamera
+    local viewportSize = Camera.ViewportSize
+    local shiftLockPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2) -- Tâm màn hình / Shift Lock
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            if not tracerDrawings[p] then
+                local line = Drawing.new("Line")
+                line.Color = Color3.fromRGB(255, 0, 0)
+                line.Thickness = 1.5
+                line.Transparency = 1
+
+                local box = Drawing.new("Square")
+                box.Color = Color3.fromRGB(255, 0, 0)
+                box.Thickness = 1.5
+                box.Filled = false
+                box.Transparency = 1
+
+                tracerDrawings[p] = {Line = line, Box = box}
+            end
+
+            local drawGroup = tracerDrawings[p]
+            local char = p.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+            if hrp and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
+                local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    -- Vẽ Line từ tâm tới target
+                    drawGroup.Line.From = shiftLockPos
+                    drawGroup.Line.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                    drawGroup.Line.Visible = true
+
+                    -- Tính kích thước Box 2D linh hoạt theo khoảng cách
+                    local head = char:FindFirstChild("Head")
+                    local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or hrpPos
+                    local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+                    local boxHeight = math.abs(headPos.Y - legPos.Y)
+                    local boxWidth = boxHeight * 0.65
+
+                    drawGroup.Box.Size = Vector2.new(boxWidth, boxHeight)
+                    drawGroup.Box.Position = Vector2.new(hrpPos.X - boxWidth / 2, hrpPos.Y - boxHeight / 2)
+                    drawGroup.Box.Visible = true
+                else
+                    drawGroup.Line.Visible = false
+                    drawGroup.Box.Visible = false
+                end
+            else
+                drawGroup.Line.Visible = false
+                drawGroup.Box.Visible = false
+            end
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if tracerDrawings[p] then
+        if tracerDrawings[p].Line then tracerDrawings[p].Line:Remove() end
+        if tracerDrawings[p].Box then tracerDrawings[p].Box:Remove() end
+        tracerDrawings[p] = nil
+    end
+end)
+
+-- 3. NÚT SHOW NAME
+local ShowNameToggle = false
+
+local function updateNames()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            if head then
+                local billboard = head:FindFirstChild("CustomNameBillboard")
+                if ShowNameToggle then
+                    if not billboard then
+                        billboard = Instance.new("BillboardGui")
+                        billboard.Name = "CustomNameBillboard"
+                        billboard.Size = UDim2.new(0, 200, 0, 30)
+                        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                        billboard.AlwaysOnTop = true
+                        billboard.Parent = head
+
+                        local nameLabel = Instance.new("TextLabel")
+                        nameLabel.Size = UDim2.new(1, 0, 1, 0)
+                        nameLabel.BackgroundTransparency = 1
+                        nameLabel.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+                        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        nameLabel.TextStrokeTransparency = 0
+                        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                        nameLabel.Font = Enum.Font.SourceSansBold
+                        nameLabel.TextSize = 14
+                        nameLabel.Parent = billboard
+                    end
+                else
+                    if billboard then billboard:Destroy() end
+                end
+            end
+        end
+    end
+end
+
+createKeybindButton(Slide1, "Show Name", UDim2.new(0.025, 0, 0, 363), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+    ShowNameToggle = state
+    updateNames()
+end)
+
+-- TỰ ĐỘNG TẢI ESP / NAME KHI NGUỜI CHƠI RESPAWN HOẶC VÀO GAME
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if EspToggle then updateESP() end
+        if ShowNameToggle then updateNames() end
+    end)
+end)
+
+for _, p in pairs(Players:GetPlayers()) do
+    p.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if EspToggle then updateESP() end
+        if ShowNameToggle then updateNames() end
+    end)
+end
+
+-- ==========================================
+-- ĐOẠN SLIDER & CÁC CHỨC NĂNG CŨ
+-- ==========================================
+local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 396), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
 
 local SliderFrame = Instance.new("Frame")
 SliderFrame.Size = UDim2.new(0.95, 0, 0, 15)
-SliderFrame.Position = UDim2.new(0.025, 0, 0, 324)
+SliderFrame.Position = UDim2.new(0.025, 0, 0, 423)
 SliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 SliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 SliderFrame.BorderSizePixel = 1
@@ -611,14 +790,21 @@ FixLagBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 3: Lumber tycoon 2
+-- SLIDE 3: Script Hub
 -- ==========================================
-local Slide3 = createSlide(" Lumber tycoon 2")
-local LT2Btn = createStyledButton(Slide3, "Chạy Script Kron Hub", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
+local Slide3 = createSlide("Script Hub")
 
+local LT2Btn = createStyledButton(Slide3, "Chạy Script Kron Hub", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
 LT2Btn.MouseButton1Click:Connect(function()
     pcall(function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/DevKron/Kron_Hub/refs/heads/main/version_1.0'))()
+    end)
+end)
+
+local IYBtn = createStyledButton(Slide3, "Chạy Script Infinite Yield", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35))
+IYBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
     end)
 end)
 
@@ -674,28 +860,15 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
             obj:Destroy()
         end
     end
-end)
+end
 -- ==========================================
--- SLIDE 5: Infinite yield
+-- SLIDE 5: Setting (Kích thước & Bảng màu GUI)
 -- ==========================================
-local Slide5 = createSlide("Infinite yield")
-
-local IYBtn = createStyledButton(Slide5, "Chạy Script Infinite Yield", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
-
-IYBtn.MouseButton1Click:Connect(function()
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
-    end)
-end)
-
--- ==========================================
--- SLIDE 6: Setting (Kích thước & Bảng màu GUI)
--- ==========================================
-local Slide6 = createSlide("Setting")
+local Slide5 = createSlide("Setting")
 
 local currentScale = 2
 
-local ScaleLbl = createStyledTextBox(Slide6, "", UDim2.new(0.025, 0, 0, 10), UDim2.new(0.95, 0, 0, 22))
+local ScaleLbl = createStyledTextBox(Slide5, "", UDim2.new(0.025, 0, 0, 10), UDim2.new(0.95, 0, 0, 22))
 ScaleLbl.Text = "Kích thước GUI: 2"
 ScaleLbl.TextColor3 = Color3.fromRGB(0, 170, 255)
 
@@ -705,7 +878,7 @@ GuiSliderFrame.Position = UDim2.new(0.025, 0, 0, 36)
 GuiSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 GuiSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 GuiSliderFrame.BorderSizePixel = 1
-GuiSliderFrame.Parent = Slide6
+GuiSliderFrame.Parent = Slide5
 
 table.insert(registeredBorders, GuiSliderFrame)
 
@@ -778,7 +951,7 @@ local function createColorPaletteSection(titleText, posY, onSelectColor)
     lbl.Font = Enum.Font.SourceSansBold
     lbl.TextSize = 13
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = Slide6
+    lbl.Parent = Slide5
 
     table.insert(registeredTexts, lbl)
 
@@ -786,7 +959,7 @@ local function createColorPaletteSection(titleText, posY, onSelectColor)
     paletteFrame.Size = UDim2.new(0.95, 0, 0, 32)
     paletteFrame.Position = UDim2.new(0.025, 0, 0, posY + 20)
     paletteFrame.BackgroundTransparency = 1
-    paletteFrame.Parent = Slide6
+    paletteFrame.Parent = Slide5
 
     local grid = Instance.new("UIGridLayout")
     grid.CellSize = UDim2.new(0, 18, 0, 14)
@@ -823,7 +996,7 @@ createColorPaletteSection("3. Chọn màu chữ GUI:", 180, function(color)
 end)
 
 -- Nút Khôi Phục Màu Mặc Định
-local ResetColorBtn = createStyledButton(Slide6, "Khôi phục màu mặc định", UDim2.new(0.025, 0, 0, 240), UDim2.new(0.95, 0, 0, 28))
+local ResetColorBtn = createStyledButton(Slide5, "Khôi phục màu mặc định", UDim2.new(0.025, 0, 0, 240), UDim2.new(0.95, 0, 0, 28))
 ResetColorBtn.MouseButton1Click:Connect(function()
     applyTheme(
         Color3.fromRGB(35, 35, 35),   -- Màu nền mặc định
@@ -833,16 +1006,17 @@ ResetColorBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 7: Air Walk (Đi trên không)
+-- SLIDE 6: Move
 -- ==========================================
-local Slide7 = createSlide("Air Walk")
+local Slide6 = createSlide("Move")
 
+-- 1. NÚT AIR WALK
 local flyToggle = false
 local flySpeed = 50
 local flyConnection = nil
 local bv = nil
 
-createKeybindButton(Slide7, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+createKeybindButton(Slide6, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
     flyToggle = state
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -875,11 +1049,7 @@ createKeybindButton(Slide7, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim
     end
 end)
 
--- ==========================================
--- SLIDE 8: Tốc biến Blox Fruit
--- ==========================================
-local Slide8 = createSlide("Tốc biến")
-
+-- 2. NÚT TỐC BIẾN
 local flashStepToggle = false
 local flashStepDistance = 100
 
@@ -915,6 +1085,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-createKeybindButton(Slide8, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
+createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
     flashStepToggle = state
 end)
