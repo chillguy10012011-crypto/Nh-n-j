@@ -331,7 +331,6 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
 
     return toggleBtn, keybindBox
 end
-
 -- ==========================================
 -- SLIDE 1: Project smash
 -- ==========================================
@@ -439,7 +438,7 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
--- LOGIC BẬT/TẮT ANTI-STUN MỚI THÊM
+-- LOGIC BẬT/TẮT ANTI-STUN
 local AntiStunToggle = false
 local antiStunConnection = nil
 
@@ -496,7 +495,6 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
--- ĐẨY CÁC THÀNH PHẦN KHÁC XUỐNG DƯỚI ĐỂ TRÁNH ĐÈ LÊN NÚT MỚI
 local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 297), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
@@ -600,41 +598,11 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-
 -- ==========================================
--- SLIDE 2: Deadrais
+-- SLIDE 2: Fix lag
 -- ==========================================
-local Slide2 = createSlide(" Deadrais ")
-local PushToggle = false
-
-createKeybindButton(Slide2, "Đẩy Model gần", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
-    PushToggle = state
-end)
-
-RunService.Heartbeat:Connect(function()
-    if PushToggle and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local myHrp = LocalPlayer.Character.HumanoidRootPart
-        for _, obj in pairs(Workspace:GetChildren()) do
-            if obj:IsA("Model") and obj ~= LocalPlayer.Character then
-                local targetPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("PrimaryPart") or obj:FindFirstChildWhichIsA("BasePart")
-                if targetPart and not Players:GetPlayerFromCharacter(obj) then
-                    local dist = (targetPart.Position - myHrp.Position).Magnitude
-                    if dist <= 10 then
-                        local dir = (targetPart.Position - myHrp.Position).Unit
-                        if dir ~= dir then dir = Vector3.new(1, 0, 0) end
-                        targetPart.CFrame = CFrame.new(myHrp.Position + (dir * 11))
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- ==========================================
--- SLIDE 3: Fix lag
--- ==========================================
-local Slide3 = createSlide(" fix lag ")
-local FixLagBtn = createStyledButton(Slide3, "Chạy Code Fix Lag", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
+local Slide2 = createSlide(" fix lag ")
+local FixLagBtn = createStyledButton(Slide2, "Chạy Code Fix Lag", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
 
 FixLagBtn.MouseButton1Click:Connect(function()
     pcall(function()
@@ -643,26 +611,34 @@ FixLagBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 4: Lumber tycoon 2
+-- SLIDE 3: Script Hub
 -- ==========================================
-local Slide4 = createSlide(" Lumber tycoon 2")
-local LT2Btn = createStyledButton(Slide4, "Chạy Script Kron Hub", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
+local Slide3 = createSlide("Script Hub")
 
+local LT2Btn = createStyledButton(Slide3, "Chạy Script Kron Hub", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
 LT2Btn.MouseButton1Click:Connect(function()
     pcall(function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/DevKron/Kron_Hub/refs/heads/main/version_1.0'))()
     end)
 end)
--- ==========================================
--- SLIDE 5: Spawn model
--- ==========================================
-local Slide5 = createSlide(" spawn model ")
 
-local SpawnBox = createStyledTextBox(Slide5, "Nhập tên Model...", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 30))
+local IYBtn = createStyledButton(Slide3, "Chạy Script Infinite Yield", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35))
+IYBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end)
+end)
 
-local SpawnUnanchoredBtn = createStyledButton(Slide5, "Triệu hồi (Có tác động lực)", UDim2.new(0.025, 0, 0, 60), UDim2.new(0.95, 0, 0, 30))
-local SpawnAnchoredBtn = createStyledButton(Slide5, "Triệu hồi (Không tác động lực)", UDim2.new(0.025, 0, 0, 100), UDim2.new(0.95, 0, 0, 30))
-local DeleteModelBtn = createStyledButton(Slide5, "Xóa toàn bộ Model theo tên", UDim2.new(0.025, 0, 0, 140), UDim2.new(0.95, 0, 0, 30))
+-- ==========================================
+-- SLIDE 4: Spawn model
+-- ==========================================
+local Slide4 = createSlide(" spawn model ")
+
+local SpawnBox = createStyledTextBox(Slide4, "Nhập tên Model...", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 30))
+
+local SpawnUnanchoredBtn = createStyledButton(Slide4, "Triệu hồi (Có tác động lực)", UDim2.new(0.025, 0, 0, 60), UDim2.new(0.95, 0, 0, 30))
+local SpawnAnchoredBtn = createStyledButton(Slide4, "Triệu hồi (Không tác động lực)", UDim2.new(0.025, 0, 0, 100), UDim2.new(0.95, 0, 0, 30))
+local DeleteModelBtn = createStyledButton(Slide4, "Xóa toàn bộ Model theo tên", UDim2.new(0.025, 0, 0, 140), UDim2.new(0.95, 0, 0, 30))
 
 local function spawnModelLogic(isAnchored)
     local name = SpawnBox.Text
@@ -706,81 +682,14 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
         end
     end
 end)
-
 -- ==========================================
--- SLIDE 6: Dynamic Collision
+-- SLIDE 5: Setting (Kích thước & Bảng màu GUI)
 -- ==========================================
-local Slide6 = createSlide("Dynamic Collision")
-
-local CollisionToggle = false
-
-createKeybindButton(Slide6, "Auto CanCollide", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
-    CollisionToggle = state
-    if not CollisionToggle and LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-    end
-end)
-
-local isTouching = false
-
-local function setupTouchDetection(char)
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Touched:Connect(function(hit)
-                if not CollisionToggle then return end
-                if hit and not hit:IsDescendantOf(char) then
-                    isTouching = true
-                end
-            end)
-
-            part.TouchEnded:Connect(function(hit)
-                if not CollisionToggle then return end
-                if hit and not hit:IsDescendantOf(char) then
-                    isTouching = false
-                end
-            end)
-        end
-    end
-end
-
-if LocalPlayer.Character then setupTouchDetection(LocalPlayer.Character) end
-LocalPlayer.CharacterAdded:Connect(setupTouchDetection)
-
-RunService.Stepped:Connect(function()
-    if CollisionToggle and LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = isTouching
-            end
-        end
-    end
-end)
-
--- ==========================================
--- SLIDE 7: Infinite yield
--- ==========================================
-local Slide7 = createSlide("Infinite yield")
-
-local IYBtn = createStyledButton(Slide7, "Chạy Script Infinite Yield", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
-
-IYBtn.MouseButton1Click:Connect(function()
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
-    end)
-end)
-
--- ==========================================
--- SLIDE 8: Setting (Kích thước & Bảng màu GUI)
--- ==========================================
-local Slide8 = createSlide("Setting")
+local Slide5 = createSlide("Setting")
 
 local currentScale = 2
 
-local ScaleLbl = createStyledTextBox(Slide8, "", UDim2.new(0.025, 0, 0, 10), UDim2.new(0.95, 0, 0, 22))
+local ScaleLbl = createStyledTextBox(Slide5, "", UDim2.new(0.025, 0, 0, 10), UDim2.new(0.95, 0, 0, 22))
 ScaleLbl.Text = "Kích thước GUI: 2"
 ScaleLbl.TextColor3 = Color3.fromRGB(0, 170, 255)
 
@@ -790,7 +699,7 @@ GuiSliderFrame.Position = UDim2.new(0.025, 0, 0, 36)
 GuiSliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 GuiSliderFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
 GuiSliderFrame.BorderSizePixel = 1
-GuiSliderFrame.Parent = Slide8
+GuiSliderFrame.Parent = Slide5
 
 table.insert(registeredBorders, GuiSliderFrame)
 
@@ -863,7 +772,7 @@ local function createColorPaletteSection(titleText, posY, onSelectColor)
     lbl.Font = Enum.Font.SourceSansBold
     lbl.TextSize = 13
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = Slide8
+    lbl.Parent = Slide5
 
     table.insert(registeredTexts, lbl)
 
@@ -871,7 +780,7 @@ local function createColorPaletteSection(titleText, posY, onSelectColor)
     paletteFrame.Size = UDim2.new(0.95, 0, 0, 32)
     paletteFrame.Position = UDim2.new(0.025, 0, 0, posY + 20)
     paletteFrame.BackgroundTransparency = 1
-    paletteFrame.Parent = Slide8
+    paletteFrame.Parent = Slide5
 
     local grid = Instance.new("UIGridLayout")
     grid.CellSize = UDim2.new(0, 18, 0, 14)
@@ -908,7 +817,7 @@ createColorPaletteSection("3. Chọn màu chữ GUI:", 180, function(color)
 end)
 
 -- Nút Khôi Phục Màu Mặc Định
-local ResetColorBtn = createStyledButton(Slide8, "Khôi phục màu mặc định", UDim2.new(0.025, 0, 0, 240), UDim2.new(0.95, 0, 0, 28))
+local ResetColorBtn = createStyledButton(Slide5, "Khôi phục màu mặc định", UDim2.new(0.025, 0, 0, 240), UDim2.new(0.95, 0, 0, 28))
 ResetColorBtn.MouseButton1Click:Connect(function()
     applyTheme(
         Color3.fromRGB(35, 35, 35),   -- Màu nền mặc định
@@ -918,16 +827,17 @@ ResetColorBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- SLIDE 9: Air Walk (Đi trên không)
+-- SLIDE 6: Move (TÊN MỚI)
 -- ==========================================
-local Slide9 = createSlide("Air Walk")
+local Slide6 = createSlide("Move")
 
+-- 1. NÚT AIR WALK
 local flyToggle = false
 local flySpeed = 50
 local flyConnection = nil
 local bv = nil
 
-createKeybindButton(Slide9, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+createKeybindButton(Slide6, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), nil, function(state)
     flyToggle = state
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -960,11 +870,7 @@ createKeybindButton(Slide9, "Đi trên không", UDim2.new(0.025, 0, 0, 20), UDim
     end
 end)
 
--- ==========================================
--- SLIDE 10: Tốc biến Blox Fruit
--- ==========================================
-local Slide10 = createSlide("Tốc biến")
-
+-- 2. NÚT TỐC BIẾN
 local flashStepToggle = false
 local flashStepDistance = 100
 
@@ -1000,6 +906,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-createKeybindButton(Slide10, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
+createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
     flashStepToggle = state
 end)
