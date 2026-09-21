@@ -1,3 +1,90 @@
+-- ========================================================
+-- BỘ CHỌN THIẾT BỊ (DEVICE SELECTOR)
+-- ========================================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Tạo ScreenGui chọn thiết bị
+local DeviceGui = Instance.new("ScreenGui")
+DeviceGui.Name = "DeviceSelectorGui"
+DeviceGui.ResetOnSpawn = false
+DeviceGui.Parent = PlayerGui
+
+-- Frame nền chính
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 300, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -90)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = DeviceGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Tiêu đề
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "CHỌN THIẾT BỊ"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+-- Nút Điện thoại
+local PhoneBtn = Instance.new("TextButton")
+PhoneBtn.Name = "PhoneBtn"
+PhoneBtn.Size = UDim2.new(0, 260, 0, 45)
+PhoneBtn.Position = UDim2.new(0.5, -130, 0, 50)
+PhoneBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+PhoneBtn.Text = "📱 Điện thoại (Mobile)"
+PhoneBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PhoneBtn.TextSize = 16
+PhoneBtn.Font = Enum.Font.SourceSansSemiBold
+PhoneBtn.Parent = MainFrame
+
+local PhoneCorner = Instance.new("UICorner")
+PhoneCorner.CornerRadius = UDim.new(0, 6)
+PhoneCorner.Parent = PhoneBtn
+
+-- Nút Laptop
+local PCBtn = Instance.new("TextButton")
+PCBtn.Name = "PCBtn"
+PCBtn.Size = UDim2.new(0, 260, 0, 45)
+PCBtn.Position = UDim2.new(0.5, -130, 0, 105)
+PCBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+PCBtn.Text = "💻 Laptop / PC"
+PCBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PCBtn.TextSize = 16
+PCBtn.Font = Enum.Font.SourceSansSemiBold
+PCBtn.Parent = MainFrame
+
+local PCCorner = Instance.new("UICorner")
+PCCorner.CornerRadius = UDim.new(0, 6)
+PCCorner.Parent = PCBtn
+
+-- Hàm khởi chạy GUI chính
+local function startMainScript(deviceType)
+    print("Đã chọn thiết bị: " .. deviceType)
+    DeviceGui:Destroy() -- Xóa bảng chọn thiết bị
+    
+    -- ========================================================
+    -- DÁN TOÀN BỘ "CODE CHỨC NĂNG" CỦA BẠN VÀO DƯỚI ĐÂY
+    -- ========================================================
+    
+end
+
+-- Lắng nghe sự kiện click nút
+PhoneBtn.MouseButton1Click:Connect(function()
+    startMainScript("Mobile")
+end)
+
+PCBtn.MouseButton1Click:Connect(function()
+    startMainScript("PC")
+end)
 -- // TỐI ƯU HÀM BẢO MẬT CLONEREF
 local function getService(serviceName)
     local rawService = game:GetService(serviceName)
