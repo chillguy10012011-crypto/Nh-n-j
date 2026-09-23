@@ -1,3 +1,5 @@
+-- 🔵 PHẦN 1/4: KHỞI TẠO, SERVICE, UI FRAMEWORK & CORE COMPONENTS
+
 -- // TỐI ƯU HÀM BẢO MẬT CLONEREF
 local function getService(serviceName)
     local rawService = game:GetService(serviceName)
@@ -155,6 +157,7 @@ local registeredBackgrounds = {MainFrame, ContentArea}
 local registeredBorders = {MainFrame, TitleBar, Sidebar}
 local registeredTexts = {TitleText}
 local toggleButtonsRegistry = {} -- Lưu các nút toggle để đổi Style GUI 1
+local resetCallbacks = {} -- Lưu danh sách hàm Reset trạng thái các nút
 local currentGuiStyle = "Default"
 
 -- // CẬP NHẬT MÀU SẮC DYNAMIC
@@ -336,6 +339,18 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
         end
     end
 
+    -- Đăng ký hàm khôi phục nút về trạng thái OFF
+    local function forceResetOff()
+        if isToggled then
+            isToggled = false
+            updateVisuals()
+            if onToggleCallback then
+                onToggleCallback(false)
+            end
+        end
+    end
+    table.insert(resetCallbacks, forceResetOff)
+
     toggleBtn.MouseButton1Click:Connect(executeToggle)
     checkBox.MouseButton1Click:Connect(executeToggle)
 
@@ -393,6 +408,8 @@ local function setGuiStyle(styleName)
         updateFunc()
     end
 end
+-- 🟢 PHẦN 2/4: SLIDE 1 (PROJECT SMASH)
+
 -- ==========================================
 -- SLIDE 1: Project smash
 -- ==========================================
@@ -830,7 +847,9 @@ createKeybindButton(Slide1, "X-ray", UDim2.new(0.025, 0, 0, 444), UDim2.new(0.95
         end
     end
 end)
--- THANH KHOẢNG CÁCH TARGET
+-- 🟣 PHẦN 3/4: SLIDE 1 (TIẾP TỤC), SLIDE 2, 3, 4, 5
+
+-- THANH KHOẢNG CÁCH TARGET (Slide 1)
 local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 477), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
@@ -933,6 +952,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+
 -- ==========================================
 -- SLIDE 2: Fix lag
 -- ==========================================
@@ -1017,12 +1037,12 @@ DeleteModelBtn.MouseButton1Click:Connect(function()
         end
     end
 end)
+
 -- ==========================================
--- SLIDE 5: Setting (Bổ sung Chuyển Style GUI)
+-- SLIDE 5: Setting (Chuyển Style GUI & Theme)
 -- ==========================================
 local Slide5 = createSlide("Setting")
 
--- // NÚT ĐỔI STYLE GUI
 local StyleLabel = Instance.new("TextLabel")
 StyleLabel.Size = UDim2.new(0.95, 0, 0, 18)
 StyleLabel.Position = UDim2.new(0.025, 0, 0, 10)
@@ -1063,7 +1083,6 @@ Gui1StyleBtn.MouseButton1Click:Connect(function()
     setGuiStyle("GUI1")
 end)
 
--- // KÍCH THƯỚC GUI
 local currentScale = 2
 
 local ScaleLbl = createStyledTextBox(Slide5, "", UDim2.new(0.025, 0, 0, 68), UDim2.new(0.95, 0, 0, 22))
@@ -1131,7 +1150,6 @@ ScaleLbl.FocusLost:Connect(function()
     end
 end)
 
--- Danh sách màu sắc cho Palette chọn
 local colorList = {
     Color3.fromRGB(35, 35, 35), Color3.fromRGB(20, 20, 20), Color3.fromRGB(50, 50, 50),
     Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 85, 85), Color3.fromRGB(85, 255, 85),
@@ -1198,8 +1216,10 @@ ResetColorBtn.MouseButton1Click:Connect(function()
         Color3.fromRGB(255, 255, 255)
     )
 end)
+-- 🟡 PHẦN 4/4: SLIDE 6 (MOVE) VÀ SLIDE 7 (TEST / RESET ALL)
+
 -- ==========================================
--- SLIDE 6: Move (Hoàn chỉnh - Đã sửa lỗi NoClip + AntiFling + Fly + AirWalk + Tốc biến)
+-- SLIDE 6: Move (Fly, NoClip, AntiFling, Air Walk, Tốc biến)
 -- ==========================================
 local Slide6 = createSlide("Move")
 
@@ -1276,7 +1296,7 @@ createKeybindButton(Slide6, "Fly (Bay tự do)", UDim2.new(0.025, 0, 0, 20), UDi
     end
 end)
 
--- 2. NÚT NOCLIP + SÀN GIẢ TÀNG HÌNH (ĐÃ CỐ ĐỊNH ĐỘ CAO Y - KHÔNG BỊ BAY LÊN)
+-- 2. NÚT NOCLIP + SÀN GIẢ TÀNG HÌNH
 local noClipToggle = false
 local noClipConnection = nil
 local fakeFloor = nil
@@ -1335,7 +1355,7 @@ createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0
     end
 end)
 
--- 3. NÚT ANTIFLING (TẮT VA CHẠM VỚI NGƯỜI CHƠI KHÁC)
+-- 3. NÚT ANTIFLING (CHỐNG VĂNG)
 local antiFlingToggle = false
 local antiFlingConnection = nil
 
@@ -1363,7 +1383,7 @@ createKeybindButton(Slide6, "AntiFling (Chống văng)", UDim2.new(0.025, 0, 0, 
     end
 end)
 
--- 4. NÚT AIR WALK (ĐI TRÊN KHÔNG BẰNG PHÍM BÀN PHÍM)
+-- 4. NÚT AIR WALK (ĐI TRÊN KHÔNG BẰNG PHÍM)
 local airWalkToggle = false
 local airWalkSpeed = 50
 local airWalkConnection = nil
@@ -1402,7 +1422,7 @@ createKeybindButton(Slide6, "Đi trên không (Air Walk)", UDim2.new(0.025, 0, 0
     end
 end)
 
--- 5. NÚT TỐC BIẾN (DỊCH CHUYỂN BẰNG PHÍM R)
+-- 5. NÚT TỐC BIẾN (PHÍM R)
 local flashStepToggle = false
 local flashStepDistance = 100
 
@@ -1441,23 +1461,73 @@ end)
 createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 200), UDim2.new(0.95, 0, 0, 35), Enum.KeyCode.R, function(state)
     flashStepToggle = state
 end)
+
 -- ==========================================
--- SLIDE TEST (MỚI THÊM)
+-- SLIDE 7: Test (Slide Mới Chứa Reset All)
 -- ==========================================
-local SlideTest = createSlide("Test")
+local Slide7 = createSlide("Test")
 
-local TestBtn1 = createStyledButton(SlideTest, "1. Bẫy sự kiện chết bằng LocalScript (Client-side Godmode / Anti-Death)", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 35))
-local TestBtn2 = createStyledButton(SlideTest, "2. Giữ / Giả lập Network Ownership (Ragdoll Exploits)", UDim2.new(0.025, 0, 0, 65), UDim2.new(0.95, 0, 0, 35))
-local TestBtn3 = createStyledButton(SlideTest, "3. \"Desync\" (Bất đồng bộ Client-Server)", UDim2.new(0.025, 0, 0, 110), UDim2.new(0.95, 0, 0, 35))
+local ResetAllBtn = createStyledButton(Slide7, "Reset all / Stop all", UDim2.new(0.025, 0, 0, 20), UDim2.new(0.95, 0, 0, 40))
+ResetAllBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 
-TestBtn1.MouseButton1Click:Connect(function()
-    -- Nơi viết logic cho Nút 1
-end)
+ResetAllBtn.MouseButton1Click:Connect(function()
+    -- 1. Tắt toàn bộ trạng thái của các nút Toggle
+    for _, resetFunc in ipairs(resetCallbacks) do
+        resetFunc()
+    end
 
-TestBtn2.MouseButton1Click:Connect(function()
-    -- Nơi viết logic cho Nút 2
-end)
+    -- 2. Dọn dẹp ESP & Name Billboards
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character then
+            local hl = p.Character:FindFirstChild("CustomESPHighlight")
+            if hl then hl:Destroy() end
+            
+            local head = p.Character:FindFirstChild("Head")
+            if head then
+                local billboard = head:FindFirstChild("CustomNameBillboard")
+                if billboard then billboard:Destroy() end
+            end
+        end
+    end
 
-TestBtn3.MouseButton1Click:Connect(function()
-    -- Nơi viết logic cho Nút 3
+    -- 3. Dọn dẹp Tracer Drawings
+    if clearTracers then
+        clearTracers()
+    end
+
+    -- 4. Dọn dẹp Vật thể phụ trợ & Khôi phục trạng thái Character
+    local char = LocalPlayer.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        
+        if hrp then
+            local flyBv = hrp:FindFirstChild("FlyVelocity")
+            local flyBg = hrp:FindFirstChild("FlyGyro")
+            local airBv = hrp:FindFirstChild("AirWalkVelocity")
+            if flyBv then flyBv:Destroy() end
+            if flyBg then flyBg:Destroy() end
+            if airBv then airBv:Destroy() end
+        end
+
+        if humanoid then
+            humanoid.PlatformStand = false
+            updateAntiStunState(char)
+        end
+
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+
+    -- 5. Xóa sàn giả NoClip nếu còn
+    local floor = Workspace:FindFirstChild("CustomInvisibleFloor")
+    if floor then floor:Destroy() end
+
+    -- 6. Khôi phục X-Ray
+    if updateXrayState then
+        updateXrayState()
+    end
 end)
