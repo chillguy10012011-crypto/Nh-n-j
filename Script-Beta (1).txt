@@ -1217,7 +1217,6 @@ ResetColorBtn.MouseButton1Click:Connect(function()
     )
 end)
 -- 🟡 PHẦN 4/4: SLIDE 6 (MOVE) VÀ SLIDE 7 (TEST / RESET ALL)
-
 -- ==========================================
 -- SLIDE 6: Move (Fly, NoClip, AntiFling, Air Walk, Tốc biến)
 -- ==========================================
@@ -1355,26 +1354,28 @@ createKeybindButton(Slide6, "NoClip (Xuyên tường + Sàn giả)", UDim2.new(0
     end
 end)
 
--- 3. NÚT ANTIFLING (CHỐNG VĂNG)
+-- 3. NÚT ANTIFLING (CHUẨN VẬT LÝ - KHÔNG CẦN NOCLIP)
 local antiFlingToggle = false
 local antiFlingConnection = nil
 
-createKeybindButton(Slide6, "AntiFling (Chống văng)", UDim2.new(0.025, 0, 0, 110), UDim2.new(0.95, 0, 0, 35), nil, function(state)
+createKeybindButton(Slide6, "AntiFling (Chống văng chuẩn)", UDim2.new(0.025, 0, 0, 110), UDim2.new(0.95, 0, 0, 35), nil, function(state)
     antiFlingToggle = state
 
     if antiFlingToggle then
-        antiFlingConnection = RunService.Stepped:Connect(function()
-            if not antiFlingToggle then return end
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    for _, part in pairs(player.Character:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                        end
+        if not antiFlingConnection then
+            antiFlingConnection = RunService.Heartbeat:Connect(function()
+                if not antiFlingToggle then return end
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char.HumanoidRootPart
+                    -- Triệt tiêu gia tốc/tốc độ xoay đột ngột khi bị hack Fling tác động
+                    if hrp.RotVelocity.Magnitude > 75 or hrp.Velocity.Magnitude > 500 then
+                        hrp.RotVelocity = Vector3.new(0, 0, 0)
+                        hrp.Velocity = Vector3.new(0, 0, 0)
                     end
                 end
-            end
-        end)
+            end)
+        end
     else
         if antiFlingConnection then
             antiFlingConnection:Disconnect()
@@ -1462,7 +1463,7 @@ createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 200
     flashStepToggle = state
 end)
 
--- ==========================================
+==========================================
 -- SLIDE 7: Test (Slide Mới Chứa Reset All)
 -- ==========================================
 local Slide7 = createSlide("Test")
