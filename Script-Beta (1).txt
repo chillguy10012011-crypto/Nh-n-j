@@ -156,8 +156,8 @@ local slides = {}
 local registeredBackgrounds = {MainFrame, ContentArea}
 local registeredBorders = {MainFrame, TitleBar, Sidebar}
 local registeredTexts = {TitleText}
-local toggleButtonsRegistry = {} -- Lưu các nút toggle để đổi Style GUI 1
-local resetCallbacks = {} -- Lưu danh sách hàm Reset trạng thái các nút
+local toggleButtonsRegistry = {} 
+local resetCallbacks = {} 
 local currentGuiStyle = "Default"
 
 -- // CẬP NHẬT MÀU SẮC DYNAMIC
@@ -339,7 +339,6 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
         end
     end
 
-    -- Đăng ký hàm khôi phục nút về trạng thái OFF
     local function forceResetOff()
         if isToggled then
             isToggled = false
@@ -383,7 +382,6 @@ local function createKeybindButton(parent, defaultText, pos, size, defaultKey, o
     return toggleBtn, keybindBox
 end
 
--- Hàm thực thi đổi Style sang GUI 1
 local function setGuiStyle(styleName)
     currentGuiStyle = styleName
     if styleName == "GUI1" then
@@ -410,9 +408,6 @@ local function setGuiStyle(styleName)
 end
 -- 🟢 PHẦN 2/4: SLIDE 1 (PROJECT SMASH)
 
--- ==========================================
--- SLIDE 1: Project smash
--- ==========================================
 local Slide1 = createSlide("Project smash")
 Slide1.Visible = true
 
@@ -517,31 +512,35 @@ createKeybindButton(Slide1, "Đứng sau target", UDim2.new(0.025, 0, 0, 231), U
     StandBehindToggle = state
 end)
 
--- ANTI-STUN
+-- ANTI-STUN TỐI ƯU (KHÁNG CHOÁNG HOÀN TOÀN TRONG PROJECT SMASH)
 local AntiStunToggle = false
 local antiStunConnection = nil
 
-local function updateAntiStunState(char)
+local function applyAntiStun(char)
     if not char then return end
     local humanoid = char:WaitForChild("Humanoid", 5)
     if not humanoid then return end
 
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, not AntiStunToggle)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not AntiStunToggle)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, not AntiStunToggle)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, not AntiStunToggle)
+    pcall(function()
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, not AntiStunToggle)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not AntiStunToggle)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, not AntiStunToggle)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, not AntiStunToggle)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, not AntiStunToggle)
+    end)
 end
 
-createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(0.95, 0, 0, 28), nil, function(state)
+createKeybindButton(Slide1, "Anti-Stun (Chống choáng)", UDim2.new(0.025, 0, 0, 264), UDim2.new(0.95, 0, 0, 28), nil, function(state)
     AntiStunToggle = state
     
     if LocalPlayer.Character then
-        updateAntiStunState(LocalPlayer.Character)
+        applyAntiStun(LocalPlayer.Character)
     end
 
     if AntiStunToggle then
         if not antiStunConnection then
             antiStunConnection = RunService.RenderStepped:Connect(function()
+                if not AntiStunToggle then return end
                 local char = LocalPlayer.Character
                 if not char or not char:IsDescendantOf(Workspace) then return end
                 local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -549,14 +548,14 @@ createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(
 
                 if humanoid.Sit then
                     humanoid.Sit = false
-                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                 end
 
                 local st = humanoid:GetState()
                 if st == Enum.HumanoidStateType.Ragdoll 
                 or st == Enum.HumanoidStateType.FallingDown 
-                or st == Enum.HumanoidStateType.PlatformStanding then
-                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                or st == Enum.HumanoidStateType.PlatformStanding 
+                or st == Enum.HumanoidStateType.Physics then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Running)
                 end
             end)
         end
@@ -565,6 +564,13 @@ createKeybindButton(Slide1, "Anti-Stun", UDim2.new(0.025, 0, 0, 264), UDim2.new(
             antiStunConnection:Disconnect()
             antiStunConnection = nil
         end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(1)
+    if AntiStunToggle then
+        applyAntiStun(newChar)
     end
 end)
 
@@ -722,7 +728,6 @@ createKeybindButton(Slide1, "Show Name", UDim2.new(0.025, 0, 0, 363), UDim2.new(
     updateNames()
 end)
 
--- THANH CHỈNH ĐỘ MỜ (%) & NÚT X-RAY
 local xrayTransparencyPct = 50
 local XrayToggle = false
 local originalTranspMap = {}
@@ -849,7 +854,6 @@ createKeybindButton(Slide1, "X-ray", UDim2.new(0.025, 0, 0, 444), UDim2.new(0.95
 end)
 -- 🟣 PHẦN 3/4: SLIDE 1 (TIẾP TỤC), SLIDE 2, 3, 4, 5
 
--- THANH KHOẢNG CÁCH TARGET (Slide 1)
 local DistBox = createStyledTextBox(Slide1, "4", UDim2.new(0.025, 0, 0, 477), UDim2.new(0.95, 0, 0, 22))
 DistBox.Text = "Khoảng cách: 4 studs (Nhấn để chỉnh)"
 DistBox.TextColor3 = Color3.fromRGB(0, 170, 255)
@@ -1217,9 +1221,7 @@ ResetColorBtn.MouseButton1Click:Connect(function()
     )
 end)
 -- 🟡 PHẦN 4/4: SLIDE 6 (MOVE) VÀ SLIDE 7 (TEST / RESET ALL)
--- ==========================================
--- SLIDE 6: Move (Fly, NoClip, AntiFling, Air Walk, Tốc biến)
--- ==========================================
+
 local Slide6 = createSlide("Move")
 
 -- 1. NÚT FLY (BAY TỰ DO TRÊN MOBILE VÀ PC)
@@ -1368,7 +1370,6 @@ createKeybindButton(Slide6, "AntiFling (Chống văng chuẩn)", UDim2.new(0.025
                 local char = LocalPlayer.Character
                 if char and char:FindFirstChild("HumanoidRootPart") then
                     local hrp = char.HumanoidRootPart
-                    -- Triệt tiêu gia tốc/tốc độ xoay đột ngột khi bị hack Fling tác động
                     if hrp.RotVelocity.Magnitude > 75 or hrp.Velocity.Magnitude > 500 then
                         hrp.RotVelocity = Vector3.new(0, 0, 0)
                         hrp.Velocity = Vector3.new(0, 0, 0)
@@ -1463,7 +1464,7 @@ createKeybindButton(Slide6, "Tốc biến [Phím R]", UDim2.new(0.025, 0, 0, 200
     flashStepToggle = state
 end)
 
-==========================================
+-- ==========================================
 -- SLIDE 7: Test (Slide Mới Chứa Reset All)
 -- ==========================================
 local Slide7 = createSlide("Test")
@@ -1472,12 +1473,10 @@ local ResetAllBtn = createStyledButton(Slide7, "Reset all / Stop all", UDim2.new
 ResetAllBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 
 ResetAllBtn.MouseButton1Click:Connect(function()
-    -- 1. Tắt toàn bộ trạng thái của các nút Toggle
     for _, resetFunc in ipairs(resetCallbacks) do
         resetFunc()
     end
 
-    -- 2. Dọn dẹp ESP & Name Billboards
     for _, p in pairs(Players:GetPlayers()) do
         if p.Character then
             local hl = p.Character:FindFirstChild("CustomESPHighlight")
@@ -1491,12 +1490,10 @@ ResetAllBtn.MouseButton1Click:Connect(function()
         end
     end
 
-    -- 3. Dọn dẹp Tracer Drawings
     if clearTracers then
         clearTracers()
     end
 
-    -- 4. Dọn dẹp Vật thể phụ trợ & Khôi phục trạng thái Character
     local char = LocalPlayer.Character
     if char then
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -1513,7 +1510,7 @@ ResetAllBtn.MouseButton1Click:Connect(function()
 
         if humanoid then
             humanoid.PlatformStand = false
-            updateAntiStunState(char)
+            applyAntiStun(char)
         end
 
         for _, part in pairs(char:GetDescendants()) do
@@ -1523,11 +1520,9 @@ ResetAllBtn.MouseButton1Click:Connect(function()
         end
     end
 
-    -- 5. Xóa sàn giả NoClip nếu còn
     local floor = Workspace:FindFirstChild("CustomInvisibleFloor")
     if floor then floor:Destroy() end
 
-    -- 6. Khôi phục X-Ray
     if updateXrayState then
         updateXrayState()
     end
