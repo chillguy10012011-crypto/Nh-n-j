@@ -1,4 +1,4 @@
--- Xóa GUI cũ nếu đã chạy trước đó để tránh bị trùng lặp
+-- Xóa GUI cũ nếu đã chạy trước đó
 if game.CoreGui:FindFirstChild("LockSpeedGui") then
     game.CoreGui.LockSpeedGui:Destroy()
 end
@@ -18,7 +18,6 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Bo góc cho đẹp
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
@@ -31,28 +30,29 @@ ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextSize = 14
 ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Text = "Khóa Tốc Độ: TẮT"
+ToggleButton.Text = "Chống giảm tốc: TẮT"
 ToggleButton.Parent = MainFrame
 
 local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(0, 6)
 ButtonCorner.Parent = ToggleButton
 
--- Biến trạng thái và cấu hình
-local lockedSpeed = 16
-local isLocked = false
+-- Biến trạng thái
+local defaultSpeed = 16
+local isEnabled = false
 local connection = nil
-
 local player = game.Players.LocalPlayer
 
--- Hàm xử lý khóa tốc độ
+-- Hàm xử lý: Chỉ chống bị kéo tốc độ xuống dưới mức 16 (giúp giữ nguyên tốc chạy và không bị ép chậm lại)
 local function updateSpeed()
     local character = player.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            if humanoid.WalkSpeed ~= lockedSpeed then
-                humanoid.WalkSpeed = lockedSpeed
+            -- Nếu game định giảm tốc độ xuống dưới 16 thì kéo về 16, 
+            -- còn nếu game tăng cao hơn 16 (khi bạn bấm nút chạy nhanh) thì giữ nguyên để bạn được chạy nhanh.
+            if humanoid.WalkSpeed < defaultSpeed then
+                humanoid.WalkSpeed = defaultSpeed
             end
         end
     end
@@ -60,19 +60,15 @@ end
 
 -- Sự kiện khi bấm nút
 ToggleButton.MouseButton1Click:Connect(function()
-    isLocked = not isLocked
+    isEnabled = not isEnabled
     
-    if isLocked then
-        ToggleButton.Text = "Khóa Tốc Độ: BẬT"
+    if isEnabled then
+        ToggleButton.Text = "Chống giảm tốc: BẬT"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        
-        -- Kích hoạt liên tục để ép tốc độ luôn về 16 (chống bị game đổi hoặc script khác ghi đè)
         connection = game:GetService("RunService").RenderStepped:Connect(updateSpeed)
     else
-        ToggleButton.Text = "Khóa Tốc Độ: TẮT"
+        ToggleButton.Text = "Chống giảm tốc: TẮT"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        
-        -- Ngắt kết nối khi tắt
         if connection then
             connection:Disconnect()
             connection = nil
