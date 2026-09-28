@@ -1,22 +1,23 @@
--- Tạo GUI test với 3 nút chống Stun + Nút X chuẩn xác
+-- Tạo Code Test GUI gọn nhẹ: Chỉ 1 nút chống stun/kháng văng nhưng không bay
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Xóa GUI cũ nếu đã tồn tại
-if playerGui:FindFirstChild("AntiStunMultiTest") then
-    playerGui.AntiStunMultiTest:Destroy()
+-- Xóa GUI test cũ nếu có
+if playerGui:FindFirstChild("AntiStunNoFlyTest") then
+    playerGui.AntiStunNoFlyTest:Destroy()
 end
 
 -- Khởi tạo ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AntiStunMultiTest"
+screenGui.Name = "AntiStunNoFlyTest"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Tạo Frame chính (Tăng chiều cao lên 195 để vừa khít các nút)
+-- Tạo Frame chính
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 195)
+mainFrame.Size = UDim2.new(0, 220, 0, 110)
 mainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -26,17 +27,17 @@ mainFrame.Parent = screenGui
 
 -- Tiêu đề
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -35, 0, 30) -- Chừa chỗ cho nút X bên phải
+titleLabel.Size = UDim2.new(1, -35, 0, 30)
 titleLabel.Position = UDim2.new(0, 0, 0, 0)
 titleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "  AntiStun 3 Ways Test"
+titleLabel.Text = "  Anti-Stun (No Fly) Test"
 titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextSize = 14
+titleLabel.TextSize = 13
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
 
--- Nút X (Đóng / Xóa GUI) ở góc trên bên phải
+-- Nút X (Đóng / Xóa GUI)
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -30, 0, 0)
@@ -51,144 +52,50 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Hàm tạo nút bấm chuẩn
-local function createButton(posY, defaultText)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 32)
-    btn.Position = UDim2.new(0.05, 0, 0, posY)
-    btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Đỏ: Tắt
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Text = defaultText .. ": OFF"
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 13
-    btn.Parent = mainFrame
-    return btn
-end
+-- Nút bật/tắt tính năng chống Stun không bay
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.9, 0, 0, 38)
+toggleBtn.Position = UDim2.new(0.05, 0, 0, 45)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "Anti-Stun (No Fly): OFF"
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = mainFrame
 
--- Tạo 3 nút cho 3 cách (sắp xếp vị trí dọc đẹp mắt)
-local btnWay1 = createButton(38, "Cầm Chế Độ State")
-local btnWay2 = createButton(74, "Xóa Value/Attr Stun")
-local btnWay3 = createButton(110, "Block Animation")
+local antiStunActive = false
 
-local stateWay1 = false
-local stateWay2 = false
-local stateWay3 = false
-
--- --- CÁCH 1: Khóa Humanoid State / PlatformStanding ---
-task.spawn(function()
-    while screenGui.Parent do
-        if stateWay1 then
-            pcall(function()
-                local character = localPlayer.Character
-                if character and character:FindFirstChild("Humanoid") then
-                    local humanoid = character.Humanoid
-                    humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
-                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Stunned, false)
-                    if humanoid:GetState() == Enum.HumanoidStateType.PlatformStanding then
-                        humanoid:ChangeState(Enum.HumanoidStateType.Running)
-                    end
+-- Lógica chạy ngầm chống stun / tự phục hồi trạng thái mặt đất khi bị đánh văng
+RunService.Heartbeat:Connect(function()
+    if antiStunActive then
+        pcall(function()
+            local character = localPlayer.Character
+            if not character then return end
+            
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Khóa các trạng thái gây ngã / khựng
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+                
+                -- Nếu bị đẩy ngã hoặc văng, ép lập tức về trạng thái chạy/đứng bình thường trên mặt đất (Không tạo lực bay)
+                local curState = humanoid:GetState()
+                if curState == Enum.HumanoidStateType.PlatformStanding or curState == Enum.HumanoidStateType.Ragdoll or curState == Enum.HumanoidStateType.Freefall then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Running)
                 end
-            end)
-        end
-        task.wait(0.05)
+            end
+        end)
     end
 end)
 
-btnWay1.MouseButton1Click:Connect(function()
-    stateWay1 = not stateWay1
-    if stateWay1 then
-        btnWay1.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        btnWay1.Text = "Cầm Chế Độ State: ON"
+-- Sự kiện bấm nút
+toggleBtn.MouseButton1Click:Connect(function()
+    antiStunActive = not antiStunActive
+    if antiStunActive then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        toggleBtn.Text = "Anti-Stun (No Fly): ON"
     else
-        btnWay1.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        btnWay1.Text = "Cầm Chế Độ State: OFF"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        toggleBtn.Text = "Anti-Stun (No Fly): OFF"
     end
 end)
-
--- --- CÁCH 2: Xóa Value / Attribute Stun ---
-task.spawn(function()
-    while screenGui.Parent do
-        if stateWay2 then
-            pcall(function()
-                local character = localPlayer.Character
-                if character then
-                    for _, v in ipairs(character:GetChildren()) do
-                        if v:IsA("ValueBase") then
-                            local nameLower = v.Name:lower()
-                            if nameLower:find("stun") or nameLower:find("lock") or nameLower:find("ragdoll") or nameLower:find("action") then
-                                v:Destroy()
-                            end
-                        end
-                    end
-                    for attrName, _ in pairs(character:GetAttributes()) do
-                        local nameLower = attrName:lower()
-                        if nameLower:find("stun") or nameLower:find("lock") or nameLower:find("ragdoll") then
-                            character:SetAttribute(attrName, false)
-                        end
-                    end
-                end
-            end)
-        end
-        task.wait(0.05)
-    end
-end)
-
-btnWay2.MouseButton1Click:Connect(function()
-    stateWay2 = not stateWay2
-    if stateWay2 then
-        btnWay2.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        btnWay2.Text = "Xóa Value/Attr: ON"
-    else
-        btnWay2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        btnWay2.Text = "Xóa Value/Attr: OFF"
-    end
-end)
-
--- --- CÁCH 3: Chống Stun bằng cách can thiệp Animation ---
-task.spawn(function()
-    while screenGui.Parent do
-        if stateWay3 then
-            pcall(function()
-                local character = localPlayer.Character
-                if character and character:FindFirstChild("Humanoid") then
-                    local animator = character.Humanoid:FindFirstChildOfClass("Animator")
-                    if animator then
-                        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                            local animName = ""
-                            if track.Animation and track.Animation.AnimationId then
-                                animName = track.Animation.AnimationId:lower()
-                            end
-                            if track.Name:lower():find("stun") or track.Name:lower():find("hit") or track.Name:lower():find("knockback") or animName:find("stun") then
-                                track:Stop(0)
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-        task.wait(0.05)
-    end
-end)
-
-btnWay3.MouseButton1Click:Connect(function()
-    stateWay3 = not stateWay3
-    if stateWay3 then
-        btnWay3.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        btnWay3.Text = "Block Animation: ON"
-    else
-        btnWay3.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        btnWay3.Text = "Block Animation: OFF"
-    end
-end)
-
--- Nhãn thông báo nhỏ ở dưới cùng
-local noteLabel = Instance.new("TextLabel")
-noteLabel.Size = UDim2.new(0.9, 0, 0, 35)
-noteLabel.Position = UDim2.new(0.05, 0, 0, 148)
-noteLabel.BackgroundTransparency = 1
-noteLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-noteLabel.Text = "Bấm nút [X] đỏ góc trên để tắt GUI."
-noteLabel.Font = Enum.Font.SourceSansItalic
-noteLabel.TextSize = 12
-noteLabel.TextWrapped = true
-noteLabel.Parent = mainFrame
