@@ -1,4 +1,4 @@
--- Tạo GUI test với 3 nút chống Stun + Nút X tắt GUI
+-- Tạo GUI test với 3 nút chống Stun + Nút X chuẩn xác
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
@@ -14,9 +14,9 @@ screenGui.Name = "AntiStunMultiTest"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Tạo Frame chính
+-- Tạo Frame chính (Tăng chiều cao lên 195 để vừa khít các nút)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 210)
+mainFrame.Size = UDim2.new(0, 240, 0, 195)
 mainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -26,7 +26,7 @@ mainFrame.Parent = screenGui
 
 -- Tiêu đề
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -30, 0, 30) -- Trừ ra khoảng cho nút X
+titleLabel.Size = UDim2.new(1, -35, 0, 30) -- Chừa chỗ cho nút X bên phải
 titleLabel.Position = UDim2.new(0, 0, 0, 0)
 titleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -40,7 +40,7 @@ titleLabel.Parent = mainFrame
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -30, 0, 0)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.Text = "X"
 closeBtn.Font = Enum.Font.SourceSansBold
@@ -65,10 +65,10 @@ local function createButton(posY, defaultText)
     return btn
 end
 
--- Tạo 3 nút cho 3 cách
-local btnWay1 = createButton(40, "Cầm Chế Độ State")
-local btnWay2 = createButton(78, "Xóa Value/Attr Stun")
-local btnWay3 = createButton(116, "Block Animation")
+-- Tạo 3 nút cho 3 cách (sắp xếp vị trí dọc đẹp mắt)
+local btnWay1 = createButton(38, "Cầm Chế Độ State")
+local btnWay2 = createButton(74, "Xóa Value/Attr Stun")
+local btnWay3 = createButton(110, "Block Animation")
 
 local stateWay1 = false
 local stateWay2 = false
@@ -181,13 +181,14 @@ btnWay3.MouseButton1Click:Connect(function()
     end
 end)
 
--- Nhãn hướng dẫn nhỏ ở dưới
+-- Nhãn thông báo nhỏ ở dưới cùng
 local noteLabel = Instance.new("TextLabel")
-noteLabel.Size = UDim2.new(0.9, 0, 0, 25)
-noteLabel.Position = UDim2.new(0.05, 0, 0, 155)
+noteLabel.Size = UDim2.new(0.9, 0, 0, 35)
+noteLabel.Position = UDim2.new(0.05, 0, 0, 148)
 noteLabel.BackgroundTransparency = 1
 noteLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-noteLabel.Text = "Bấm nút X góc phải để tắt GUI test!"
+noteLabel.Text = "Bấm nút [X] đỏ góc trên để tắt GUI."
 noteLabel.Font = Enum.Font.SourceSansItalic
 noteLabel.TextSize = 12
+noteLabel.TextWrapped = true
 noteLabel.Parent = mainFrame
