@@ -1,7 +1,15 @@
-ítlocal Players = game:GetService("Players")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
+
+-- // Cơ chế tự xóa GUI cũ (Tránh Multi-GUI) //
+if CoreGui:FindFirstChild("AntiFlingTestGui") then
+    CoreGui.AntiFlingTestGui:Destroy()
+end
+if LocalPlayer.PlayerGui:FindFirstChild("AntiFlingTestGui") then
+    LocalPlayer.PlayerGui.AntiFlingTestGui:Destroy()
+end
 
 -- Biến trạng thái và ngưỡng giới hạn vận tốc văng
 getgenv().AntiFlingEnabled = false 
