@@ -5,7 +5,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Biến trạng thái và ngưỡng giới hạn vận tốc văng
 getgenv().AntiFlingEnabled = false 
-local MAX_VELOCITY_THRESHOLD = 10 -- Ngưỡng vận tốc tối đa khi bị đẩy lùi
+local MAX_VELOCITY_THRESHOLD = 0 -- Ngưỡng vận tốc tối đa khi bị đẩy lùi
 
 -- Tạo ScreenGui để hiển thị nút bấm
 local screenGui = Instance.new("ScreenGui")
