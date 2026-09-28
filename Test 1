@@ -1,77 +1,89 @@
--- Xóa GUI cũ nếu đã chạy trước đó
-if game.CoreGui:FindFirstChild("LockSpeedGui") then
-    game.CoreGui.LockSpeedGui:Destroy()
-end
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
 
--- Tạo ScreenGui chính
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LockSpeedGui"
-ScreenGui.Parent = game.CoreGui
+-- Biến trạng thái và ngưỡng giới hạn vận tốc văng
+getgenv().AntiFlingEnabled = false 
+local MAX_VELOCITY_THRESHOLD = 80 -- Ngưỡng vận tốc tối đa khi bị đẩy lùi
 
--- Tạo Frame chứa nút bấm
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 180, 0, 60)
-MainFrame.Position = UDim2.new(0.5, -90, 0.1, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+-- Tạo ScreenGui để hiển thị nút bấm
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AntiFlingTestGui"
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
-
--- Tạo Nút Bật/Tắt
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(1, -16, 1, -16)
-ToggleButton.Position = UDim2.new(0, 8, 0, 8)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.TextSize = 14
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Text = "Chống giảm tốc: TẮT"
-ToggleButton.Parent = MainFrame
-
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 6)
-ButtonCorner.Parent = ToggleButton
-
--- Biến trạng thái
-local defaultSpeed = 16
-local isEnabled = false
-local connection = nil
-local player = game.Players.LocalPlayer
-
--- Hàm xử lý: Chỉ chống bị kéo tốc độ xuống dưới mức 16 (giúp giữ nguyên tốc chạy và không bị ép chậm lại)
-local function updateSpeed()
-    local character = player.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            -- Nếu game định giảm tốc độ xuống dưới 16 thì kéo về 16, 
-            -- còn nếu game tăng cao hơn 16 (khi bạn bấm nút chạy nhanh) thì giữ nguyên để bạn được chạy nhanh.
-            if humanoid.WalkSpeed < defaultSpeed then
-                humanoid.WalkSpeed = defaultSpeed
-            end
-        end
+-- Bảo vệ GUI trên các Executor hỗ trợ
+if syn and syn.protect_gui then
+    syn.protect_gui(screenGui)
+    screenGui.Parent = CoreGui
+else
+    pcall(function()
+        screenGui.Parent = CoreGui
+    end)
+    if screenGui.Parent ~= CoreGui then
+        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
 end
 
--- Sự kiện khi bấm nút
-ToggleButton.MouseButton1Click:Connect(function()
-    isEnabled = not isEnabled
-    
-    if isEnabled then
-        ToggleButton.Text = "Chống giảm tốc: BẬT"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        connection = game:GetService("RunService").RenderStepped:Connect(updateSpeed)
+-- Tạo khung chính (Frame)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 180, 0, 60)
+mainFrame.Position = UDim2.new(0.5, -90, 0.1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = mainFrame
+
+-- Tạo nút bấm bật/tắt (Toggle Button)
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, -16, 1, -16)
+toggleButton.Position = UDim2.new(0, 8, 0, 8)
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 14
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.Text = "Anti-Fling: [ TẮT ]"
+toggleButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = toggleButton
+
+-- Xử lý sự kiện click để đổi trạng thái
+toggleButton.MouseButton1Click:Connect(function()
+    getgenv().AntiFlingEnabled = not getgenv().AntiFlingEnabled
+    if getgenv().AntiFlingEnabled then
+        toggleButton.Text = "Anti-Fling: [ BẬT ]"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0) -- Màu xanh khi bật
     else
-        ToggleButton.Text = "Chống giảm tốc: TẮT"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        if connection then
-            connection:Disconnect()
-            connection = nil
+        toggleButton.Text = "Anti-Fling: [ TẮT ]"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- Màu xám khi tắt
+    end
+end)
+
+-- Vòng lặp kiểm tra và kìm hãm vận tốc văng ngầm
+RunService.Heartbeat:Connect(function()
+    if not getgenv().AntiFlingEnabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    
+    if humanoidRootPart and humanoid then
+        local currentVelocity = humanoidRootPart.AssemblyLinearVelocity
+        local horizontalSpeed = Vector3.new(currentVelocity.X, 0, currentVelocity.Z).Magnitude
+        
+        -- Nếu tốc độ ngang vượt ngưỡng và đang rơi/bay trên không do ăn đòn
+        if horizontalSpeed > MAX_VELOCITY_THRESHOLD and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+            humanoidRootPart.AssemblyLinearVelocity = Vector3.new(
+                currentVelocity.X > 0 and math.min(currentVelocity.X, MAX_VELOCITY_THRESHOLD) or math.max(currentVelocity.X, -MAX_VELOCITY_THRESHOLD),
+                currentVelocity.Y, -- Giữ nguyên lực dọc (trục Y) để không bị lỗi đứng lơ lửng
+                currentVelocity.Z > 0 and math.min(currentVelocity.Z, MAX_VELOCITY_THRESHOLD) or math.max(currentVelocity.Z, -MAX_VELOCITY_THRESHOLD)
+            )
         end
     end
 end)
