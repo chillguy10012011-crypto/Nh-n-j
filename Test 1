@@ -1,201 +1,81 @@
--- Tạo Code Test GUI: Thanh chỉnh tốc độ (Slider + TextBox) và nút bật/tắt
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local localPlayer = Players.LocalPlayer
-local playerGui = localPlayer:WaitForChild("PlayerGui")
-
--- Xóa GUI test cũ nếu có
-if playerGui:FindFirstChild("SpeedControllerTest") then
-    playerGui.SpeedControllerTest:Destroy()
+-- Xóa GUI cũ nếu đã chạy trước đó để tránh bị trùng lặp
+if game.CoreGui:FindFirstChild("LockSpeedGui") then
+    game.CoreGui.LockSpeedGui:Destroy()
 end
 
--- Khởi tạo ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SpeedControllerTest"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+-- Tạo ScreenGui chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LockSpeedGui"
+ScreenGui.Parent = game.CoreGui
 
--- Tạo Frame chính
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 260, 0, 160)
-mainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+-- Tạo Frame chứa nút bấm
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 180, 0, 60)
+MainFrame.Position = UDim2.new(0.5, -90, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
--- Tiêu đề
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -35, 0, 30)
-titleLabel.Position = UDim2.new(0, 0, 0, 0)
-titleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "  Speed Controller Test"
-titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextSize = 13
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = mainFrame
+-- Bo góc cho đẹp
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
 
--- Nút X (Đóng / Xóa GUI)
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -30, 0, 0)
-closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.SourceSansBold
-closeBtn.TextSize = 14
-closeBtn.Parent = mainFrame
+-- Tạo Nút Bật/Tắt
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, -16, 1, -16)
+ToggleButton.Position = UDim2.new(0, 8, 0, 8)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 14
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "Khóa Tốc Độ: TẮT"
+ToggleButton.Parent = MainFrame
 
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 6)
+ButtonCorner.Parent = ToggleButton
 
--- Nút Bật/Tắt tính năng Tốc độ
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
-toggleBtn.Position = UDim2.new(0.05, 0, 0, 40)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.Text = "Speed Mod: OFF"
-toggleBtn.Font = Enum.Font.SourceSansBold
-toggleBtn.TextSize = 14
-toggleBtn.Parent = mainFrame
+-- Biến trạng thái và cấu hình
+local lockedSpeed = 16
+local isLocked = false
+local connection = nil
 
--- Nhãn hiển thị tên thanh chỉnh và giá trị
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Size = UDim2.new(0.9, 0, 0, 20)
-speedLabel.Position = UDim2.new(0.05, 0, 0, 82)
-speedLabel.BackgroundTransparency = 1
-speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-speedLabel.Text = "Tốc độ: 16"
-speedLabel.Font = Enum.Font.SourceSans
-speedLabel.TextSize = 13
-speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-speedLabel.Parent = mainFrame
+local player = game.Players.LocalPlayer
 
--- Khung nền của Slider (Thanh kéo)
-local sliderBar = Instance.new("Frame")
-sliderBar.Size = UDim2.new(0.65, 0, 0, 10)
-sliderBar.Position = UDim2.new(0.05, 0, 0, 110)
-sliderBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-sliderBar.BorderSizePixel = 0
-sliderBar.Parent = mainFrame
-
--- Nút kéo trên Slider (Knob)
-local sliderKnob = Instance.new("TextButton")
-sliderKnob.Size = UDim2.new(0, 14, 0, 20)
-sliderKnob.Position = UDim2.new(0, 0, 0, -5)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-sliderKnob.Text = ""
-sliderKnob.Parent = sliderBar
-
--- Ô nhập số trực tiếp (TextBox) ở cạnh thanh kéo
-local speedTextBox = Instance.new("TextBox")
-speedTextBox.Size = UDim2.new(0.2, 0, 0, 25)
-speedTextBox.Position = UDim2.new(0.75, 0, 0, 103)
-speedTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedTextBox.Text = "16"
-speedTextBox.Font = Enum.Font.SourceSansBold
-speedTextBox.TextSize = 14
-speedTextBox.ClearTextOnFocus = false
-speedTextBox.Parent = mainFrame
-
--- Biến cấu hình tốc độ (Min: 16, Max: 200)
-local minSpeed = 16
-local maxSpeed = 200
-local currentSpeed = 16
-local speedActive = false
-local originalWalkSpeed = 16
-
--- Hàm cập nhật tốc độ
-local function updateSpeed(val)
-    currentSpeed = math.clamp(math.floor(val), minSpeed, maxSpeed)
-    speedLabel.Text = "Tốc độ: " .. currentSpeed
-    speedTextBox.Text = tostring(currentSpeed)
-    
-    -- Cập nhật vị trí nút kéo trên thanh slider
-    local ratio = (currentSpeed - minSpeed) / (maxSpeed - minSpeed)
-    sliderKnob.Position = UDim2.new(ratio, -7, 0, -5)
-end
-
--- Xử lý kéo thanh trượt (Slider Logic)
-local dragging = false
-sliderKnob.MouseButton1Down:Connect(function()
-    dragging = true
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging then
-        local mousePos = UserInputService:GetMouseLocation()
-        local barPos = sliderBar.AbsolutePosition
-        local barSize = sliderBar.AbsoluteSize
-        local ratio = math.clamp((mousePos.X - barPos.X) / barSize.X, 0, 1)
-        local val = minSpeed + ratio * (maxSpeed - minSpeed)
-        updateSpeed(val)
-    end
-end)
-
--- Xử lý khi nhập số trực tiếp vào ô TextBox
-speedTextBox.FocusLost:Connect(function(enterPressed)
-    local num = tonumber(speedTextBox.Text)
-    if num then
-        updateSpeed(num)
-    else
-        speedTextBox.Text = tostring(currentSpeed)
-    end
-end)
-
--- Vòng lặp áp dụng tốc độ và chống stun liên tục khi bật
-RunService.Heartbeat:Connect(function()
-    pcall(function()
-        local character = localPlayer.Character
-        if not character then return end
+-- Hàm xử lý khóa tốc độ
+local function updateSpeed()
+    local character = player.Character
+    if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        
         if humanoid then
-            if speedActive then
-                -- Ép tốc độ theo giá trị cài đặt và chống khựng/stun
-                humanoid.WalkSpeed = currentSpeed
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-                
-                local curState = humanoid:GetState()
-                if curState == Enum.HumanoidStateType.PlatformStanding or curState == Enum.HumanoidStateType.Ragdoll then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Running)
-                end
-            else
-                -- Trả về tốc độ mặc định khi tắt nút
-                if humanoid.WalkSpeed == currentSpeed then
-                    humanoid.WalkSpeed = originalWalkSpeed
-                end
+            if humanoid.WalkSpeed ~= lockedSpeed then
+                humanoid.WalkSpeed = lockedSpeed
             end
         end
-    end)
-end)
+    end
+end
 
--- Sự kiện bật/tắt nút chính
-toggleBtn.MouseButton1Click:Connect(function()
-    speedActive = not speedActive
-    if speedActive then
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        toggleBtn.Text = "Speed Mod: ON"
+-- Sự kiện khi bấm nút
+ToggleButton.MouseButton1Click:Connect(function()
+    isLocked = not isLocked
+    
+    if isLocked then
+        ToggleButton.Text = "Khóa Tốc Độ: BẬT"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        
+        -- Kích hoạt liên tục để ép tốc độ luôn về 16 (chống bị game đổi hoặc script khác ghi đè)
+        connection = game:GetService("RunService").RenderStepped:Connect(updateSpeed)
     else
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        toggleBtn.Text = "Speed Mod: OFF"
-        -- Khôi phục WalkSpeed gốc
-        pcall(function()
-            local humanoid = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then humanoid.WalkSpeed = 16 end
-        end)
+        ToggleButton.Text = "Khóa Tốc Độ: TẮT"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        
+        -- Ngắt kết nối khi tắt
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
     end
 end)
