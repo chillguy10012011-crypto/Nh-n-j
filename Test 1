@@ -1,104 +1,63 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
-local LocalPlayer = Players.LocalPlayer
+local lp = Players.LocalPlayer
 
--- // Cơ chế tự xóa GUI cũ (Tránh Multi-GUI) //
-if CoreGui:FindFirstChild("AntiFlingTestGui") then
-    CoreGui.AntiFlingTestGui:Destroy()
-end
-if LocalPlayer.PlayerGui:FindFirstChild("AntiFlingTestGui") then
-    LocalPlayer.PlayerGui.AntiFlingTestGui:Destroy()
-end
+-- Chỉnh số nếu bị giật/nhầm
+local MAX_SPEED = 120   -- vận tốc ngang/lên tối đa (studs/s)
+local MAX_SPIN  = 40    -- tốc độ xoay tối đa
 
--- Biến trạng thái
-getgenv().AntiFlingEnabled = false 
+local enabled = false
+local lastCF
 
--- Tạo ScreenGui để hiển thị nút bấm
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AntiFlingTestGui"
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AntiFlingGui"
+gui.ResetOnSpawn = false
+local ok, parent = pcall(function() return gethui() end)
+gui.Parent = ok and parent or (pcall(function() return game:GetService("CoreGui").Name end) and game:GetService("CoreGui") or lp:WaitForChild("PlayerGui"))
 
--- Bảo vệ GUI trên các Executor hỗ trợ
-if syn and syn.protect_gui then
-    syn.protect_gui(screenGui)
-    screenGui.Parent = CoreGui
-else
-    pcall(function()
-        screenGui.Parent = CoreGui
-    end)
-    if screenGui.Parent ~= CoreGui then
-        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    end
-end
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 150, 0, 60)
+frame.Position = UDim2.new(0.5, -75, 0.1, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame)
 
--- Tạo khung chính (Frame)
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 60)
-mainFrame.Position = UDim2.new(0.5, -90, 0.1, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(1, -16, 1, -16)
+btn.Position = UDim2.new(0, 8, 0, 8)
+btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 16
+btn.Text = "Anti-Fling: OFF"
+Instance.new("UICorner", btn)
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 8)
-uiCorner.Parent = mainFrame
-
--- Tạo nút bấm bật/tắt (Toggle Button)
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, -16, 1, -16)
-toggleButton.Position = UDim2.new(0, 8, 0, 8)
-toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.TextSize = 14
-toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.Text = "Anti-Fling: [ TẮT ]"
-toggleButton.Parent = mainFrame
-
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 6)
-btnCorner.Parent = toggleButton
-
--- Xử lý sự kiện click để đổi trạng thái
-toggleButton.MouseButton1Click:Connect(function()
-    getgenv().AntiFlingEnabled = not getgenv().AntiFlingEnabled
-    if getgenv().AntiFlingEnabled then
-        toggleButton.Text = "Anti-Fling: [ BẬT ]"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-    else
-        toggleButton.Text = "Anti-Fling: [ TẮT ]"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    end
+btn.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    btn.Text = "Anti-Fling: " .. (enabled and "ON" or "OFF")
+    btn.BackgroundColor3 = enabled and Color3.fromRGB(50, 170, 80) or Color3.fromRGB(200, 50, 50)
 end)
 
--- Vòng lặp tối ưu chống văng thông minh
+-- Logic chống fling
 RunService.Heartbeat:Connect(function()
-    if not getgenv().AntiFlingEnabled then return end
-    
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    
-    if humanoidRootPart and humanoid then
-        local currentVelocity = humanoidRootPart.AssemblyLinearVelocity
-        local speed = currentVelocity.Magnitude
-        
-        -- Kiểm tra các thuộc tính Animator hoặc Attribute xem nhân vật có đang thực hiện Dash/Skill chủ động không
-        -- Thường khi dùng chiêu lao tới, tốc độ cao nhưng nhân vật đang trong trạng thái thực hiện hành động của mình.
-        -- Nếu tốc độ quá cao (> 70) VÀ nhân vật đang ở trạng thái Freefall/FallingDown (bị hất tung/văng do ăn đòn) mà không phải do bấm lướt chủ động:
-        local currentState = humanoid:GetState()
-        
-        -- Ngưỡng tốc độ vừa phải để chặn ngay lập tức lực văng (không cần phải để 180 nữa)
-        local STRICT_THRESHOLD = 70 
-        
-        if speed > STRICT_THRESHOLD then
-            -- Kiểm tra nếu đang bị hất văng (Freefall kết hợp bị đẩy lột xác hoặc nhận lực lạ)
-            -- Ta cho phép giữ lại vận tốc nếu đang lướt (có thể check qua các giá trị hoặc ép nhẹ về mức vừa để không bị bay xa)
-            if currentState == Enum.HumanoidStateType.Freefall or currentState == Enum.HumanoidStateType.Physics then
-                -- Triệt tiêu ngay lập tức lực văng quá lớn, giữ nhân vật đứng khựng lại tại chỗ hoặc rơi xuống an toàn
-                humanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, currentVelocity.Y, 0)
-            end
+    if not enabled then return end
+    local char = lp.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local v = root.AssemblyLinearVelocity
+    local w = root.AssemblyAngularVelocity
+    local horizontal = Vector3.new(v.X, 0, v.Z).Magnitude
+
+    if horizontal > MAX_SPEED or v.Y > MAX_SPEED or w.Magnitude > MAX_SPIN then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        if lastCF then
+            root.CFrame = lastCF
         end
+    else
+        lastCF = root.CFrame
     end
 end)
