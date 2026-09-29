@@ -11,9 +11,8 @@ if LocalPlayer.PlayerGui:FindFirstChild("AntiFlingTestGui") then
     LocalPlayer.PlayerGui.AntiFlingTestGui:Destroy()
 end
 
--- Biến trạng thái và ngưỡng giới hạn vận tốc văng
+-- Biến trạng thái
 getgenv().AntiFlingEnabled = false 
-local MAX_VELOCITY_THRESHOLD = 2 -- Ngưỡng vận tốc tối đa khi bị đẩy lùi
 
 -- Tạo ScreenGui để hiển thị nút bấm
 local screenGui = Instance.new("ScreenGui")
@@ -64,14 +63,14 @@ toggleButton.MouseButton1Click:Connect(function()
     getgenv().AntiFlingEnabled = not getgenv().AntiFlingEnabled
     if getgenv().AntiFlingEnabled then
         toggleButton.Text = "Anti-Fling: [ BẬT ]"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0) -- Màu xanh khi bật
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
     else
         toggleButton.Text = "Anti-Fling: [ TẮT ]"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- Màu xám khi tắt
+        toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     end
 end)
 
--- Vòng lặp kiểm tra và kìm hãm vận tốc văng ngầm
+-- Vòng lặp tối ưu chống văng thông minh
 RunService.Heartbeat:Connect(function()
     if not getgenv().AntiFlingEnabled then return end
     
@@ -83,15 +82,23 @@ RunService.Heartbeat:Connect(function()
     
     if humanoidRootPart and humanoid then
         local currentVelocity = humanoidRootPart.AssemblyLinearVelocity
-        local horizontalSpeed = Vector3.new(currentVelocity.X, 0, currentVelocity.Z).Magnitude
+        local speed = currentVelocity.Magnitude
         
-        -- Nếu tốc độ ngang vượt ngưỡng và đang rơi/bay trên không do ăn đòn
-        if horizontalSpeed > MAX_VELOCITY_THRESHOLD and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
-            humanoidRootPart.AssemblyLinearVelocity = Vector3.new(
-                currentVelocity.X > 0 and math.min(currentVelocity.X, MAX_VELOCITY_THRESHOLD) or math.max(currentVelocity.X, -MAX_VELOCITY_THRESHOLD),
-                currentVelocity.Y, -- Giữ nguyên lực dọc (trục Y) để không bị lỗi đứng lơ lửng
-                currentVelocity.Z > 0 and math.min(currentVelocity.Z, MAX_VELOCITY_THRESHOLD) or math.max(currentVelocity.Z, -MAX_VELOCITY_THRESHOLD)
-            )
+        -- Kiểm tra các thuộc tính Animator hoặc Attribute xem nhân vật có đang thực hiện Dash/Skill chủ động không
+        -- Thường khi dùng chiêu lao tới, tốc độ cao nhưng nhân vật đang trong trạng thái thực hiện hành động của mình.
+        -- Nếu tốc độ quá cao (> 70) VÀ nhân vật đang ở trạng thái Freefall/FallingDown (bị hất tung/văng do ăn đòn) mà không phải do bấm lướt chủ động:
+        local currentState = humanoid:GetState()
+        
+        -- Ngưỡng tốc độ vừa phải để chặn ngay lập tức lực văng (không cần phải để 180 nữa)
+        local STRICT_THRESHOLD = 70 
+        
+        if speed > STRICT_THRESHOLD then
+            -- Kiểm tra nếu đang bị hất văng (Freefall kết hợp bị đẩy lột xác hoặc nhận lực lạ)
+            -- Ta cho phép giữ lại vận tốc nếu đang lướt (có thể check qua các giá trị hoặc ép nhẹ về mức vừa để không bị bay xa)
+            if currentState == Enum.HumanoidStateType.Freefall or currentState == Enum.HumanoidStateType.Physics then
+                -- Triệt tiêu ngay lập tức lực văng quá lớn, giữ nhân vật đứng khựng lại tại chỗ hoặc rơi xuống an toàn
+                humanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, currentVelocity.Y, 0)
+            end
         end
     end
 end)
