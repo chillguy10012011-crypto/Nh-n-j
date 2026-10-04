@@ -1,0 +1,428 @@
+-- // ==========================================
+-- // SCRIPT CÔNG CỤ SCAN VÀ KIỂM TRA LỖ HỎNG CODE
+-- // ==========================================
+
+local function getService(serviceName)
+    local rawService = game:GetService(serviceName)
+    if typeof(cloneref) == "function" then
+        return cloneref(rawService)
+    end
+    return rawService
+end
+
+local Players = getService("Players")
+local UserInputService = getService("UserInputService")
+local CoreGui = getService("CoreGui")
+local Workspace = getService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- Hàm kéo thả Frame
+local function enableDragging(frame, dragHandle)
+    dragHandle = dragHandle or frame
+    local dragging, dragInput, dragStart, startPos
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ScreenGui Chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "VulnerabilityScannerGUI"
+ScreenGui.ResetOnSpawn = false
+
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Nút Bật/Tắt Hình Tròn
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "ToggleButton"
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ToggleBtn.BorderSizePixel = 2
+ToggleBtn.Text = "SCAN"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 14
+ToggleBtn.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(1, 0)
+ToggleCorner.Parent = ToggleBtn
+
+enableDragging(ToggleBtn)
+
+-- Khung Chính (MainFrame)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 550, 0, 380)
+MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+MainFrame.BorderSizePixel = 2
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.BorderColor3 = Color3.fromRGB(0, 170, 255)
+TitleBar.BorderSizePixel = 1
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -40, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "ROBLOX VULNERABILITY SCANNER SYSTEM"
+TitleText.TextColor3 = Color3.fromRGB(0, 170, 255)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 15
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+enableDragging(MainFrame, TitleBar)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Sidebar Chứa Các Slide
+local Sidebar = Instance.new("ScrollingFrame")
+Sidebar.Size = UDim2.new(0, 150, 1, -30)
+Sidebar.Position = UDim2.new(0, 0, 0, 30)
+Sidebar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Sidebar.BorderColor3 = Color3.fromRGB(0, 170, 255)
+Sidebar.BorderSizePixel = 1
+Sidebar.ScrollBarThickness = 4
+Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+Sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Sidebar.Parent = MainFrame
+
+local SidebarLayout = Instance.new("UIListLayout")
+SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SidebarLayout.Padding = UDim.new(0, 2)
+SidebarLayout.Parent = Sidebar
+
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -150, 1, -30)
+ContentArea.Position = UDim2.new(0, 150, 0, 30)
+ContentArea.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ContentArea.BorderSizePixel = 0
+ContentArea.Parent = MainFrame
+
+local slides = {}
+
+local function createSlide(name)
+    local slideFrame = Instance.new("ScrollingFrame")
+    slideFrame.Name = name
+    slideFrame.Size = UDim2.new(1, 0, 1, 0)
+    slideFrame.BackgroundTransparency = 1
+    slideFrame.BorderSizePixel = 0
+    slideFrame.ScrollBarThickness = 6
+    slideFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    slideFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    slideFrame.Visible = false
+    slideFrame.Parent = ContentArea
+
+    local navButton = Instance.new("TextButton")
+    navButton.Size = UDim2.new(1, 0, 0, 35)
+    navButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    navButton.BorderColor3 = Color3.fromRGB(0, 170, 255)
+    navButton.BorderSizePixel = 1
+    navButton.Text = name
+    navButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    navButton.Font = Enum.Font.SourceSans
+    navButton.TextSize = 14
+    navButton.Parent = Sidebar
+
+    navButton.MouseButton1Click:Connect(function()
+        for _, s in pairs(slides) do s.Visible = false end
+        slideFrame.Visible = true
+    end)
+
+    slides[name] = slideFrame
+    return slideFrame
+end
+
+-- ==========================================
+-- TAB 1: KHUNG 1 & NÚT 1 (SCAN 1 - QUÉT TOÀN BỘ SCRIPT)
+-- ==========================================
+local SlideScan1 = createSlide("Scan (1) Quét Sâu")
+
+local BtnScan1 = Instance.new("TextButton")
+BtnScan1.Size = UDim2.new(0.95, 0, 0, 35)
+BtnScan1.Position = UDim2.new(0.025, 0, 0, 10)
+BtnScan1.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+BtnScan1.BorderColor3 = Color3.fromRGB(0, 170, 255)
+BtnScan1.BorderSizePixel = 1
+BtnScan1.Text = "Bắt đầu Scan (1) Script Game"
+BtnScan1.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnScan1.Font = Enum.Font.SourceSansBold
+BtnScan1.TextSize = 14
+BtnScan1.Parent = SlideScan1
+
+-- Khung hiển thị danh sách đánh dấu các script có lỗi
+local ListContainer = Instance.new("ScrollingFrame")
+ListContainer.Size = UDim2.new(0.95, 0, 0, 270)
+ListContainer.Position = UDim2.new(0.025, 0, 0, 55)
+ListContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ListContainer.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ListContainer.BorderSizePixel = 1
+ListContainer.ScrollBarThickness = 6
+ListContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+ListContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ListContainer.Parent = SlideScan1
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Padding = UDim.new(0, 4)
+ListLayout.Parent = ListContainer
+
+-- Logic quét script bỏ qua UI, Animation, VFX
+BtnScan1.MouseButton1Click:Connect(function()
+    for _, child in pairs(ListContainer:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    
+    local foundCount = 0
+    
+    -- Duyệt qua toàn bộ game để tìm Script / LocalScript / ModuleScript
+    local function scanRecursive(parent)
+        for _, obj in pairs(parent:GetChildren()) do
+            if obj:IsA("LuaSourceContainer") then -- Script, LocalScript, ModuleScript
+                local nameLower = obj.Name:lower()
+                
+                -- Bỏ qua các script UI/GUI, Animation, VFX, v.v.
+                local isIgnored = nameLower:find("ui") or nameLower:find("gui") or 
+                                  nameLower:find("anim") or nameLower:find("vfx") or 
+                                  nameLower:find("effect") or nameLower:find("particle") or
+                                  nameLower:find("clientcontrol")
+                                  
+                if not isIgnored then
+                    foundCount = foundCount + 1
+                    
+                    local row = Instance.new("Frame")
+                    row.Size = UDim2.new(1, -5, 0, 30)
+                    row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                    row.BorderSizePixel = 0
+                    row.Parent = ListContainer
+                    
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(0.7, 0, 1, 0)
+                    lbl.Position = UDim2.new(0.02, 0, 0, 0)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = "⚠️ [" .. obj.ClassName .. "] " .. obj:GetFullName()
+                    lbl.TextColor3 = Color3.fromRGB(255, 100, 100)
+                    lbl.Font = Enum.Font.SourceSans
+                    lbl.TextSize = 12
+                    lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.Parent = row
+                    
+                    local statusBtn = Instance.new("TextButton")
+                    statusBtn.Size = UDim2.new(0.25, 0, 0.8, 0)
+                    statusBtn.Position = UDim2.new(0.73, 0, 0.1, 0)
+                    statusBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+                    statusBtn.Text = "Nghi vấn lỗi"
+                    statusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    statusBtn.Font = Enum.Font.SourceSansBold
+                    statusBtn.TextSize = 11
+                    statusBtn.Parent = row
+                end
+            end
+            
+            -- Tránh quét vào CoreGui hoặc các thành phần hệ thống không cần thiết
+            if obj ~= CoreGui and obj ~= Players then
+                pcall(function()
+                    scanRecursive(obj)
+                end)
+            end
+        end
+    end
+    
+    scanRecursive(Workspace)
+    pcall(function() scanRecursive(game:GetService("ReplicatedStorage")) end)
+    pcall(function() scanRecursive(game:GetService("ServerScriptService")) end)
+    pcall(function() scanRecursive(game:GetService("ServerStorage")) end)
+    
+    if foundCount == 0 then
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 0, 30)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = " Không tìm thấy script đáng ngờ nào!"
+        lbl.TextColor3 = Color3.fromRGB(100, 255, 100)
+        lbl.Font = Enum.Font.SourceSansBold
+        lbl.TextSize = 13
+        lbl.Parent = ListContainer
+    end
+end)
+
+
+-- ==========================================
+-- TAB 2: KHUNG 2 & NÚT 2 (SCAN 2 - KIỂM TRA MÃ CODE NHẬP VÀO)
+-- ==========================================
+local SlideScan2 = createSlide("Scan (2) Input")
+
+local InputLabel = Instance.new("TextLabel")
+InputLabel.Size = UDim2.new(0.95, 0, 0, 20)
+InputLabel.Position = UDim2.new(0.025, 0, 0, 10)
+InputLabel.BackgroundTransparency = 1
+InputLabel.Text = "Khung 2: Nhập Code / Script cần kiểm tra lỗ hổng:"
+InputLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+InputLabel.Font = Enum.Font.SourceSansBold
+InputLabel.TextSize = 13
+InputLabel.TextXAlignment = Enum.TextXAlignment.Left
+InputLabel.Parent = SlideScan2
+
+-- Khung nhập script (Input)
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(0.95, 0, 0, 110)
+InputBox.Position = UDim2.new(0.025, 0, 0, 32)
+InputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+InputBox.BorderColor3 = Color3.fromRGB(0, 170, 255)
+InputBox.BorderSizePixel = 1
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.PlaceholderText = "-- Dán code Lua vào đây để quét lỗ hổng (Ví dụ: RemoteEvent, thay đổi chỉ số máu, v.v)..."
+InputBox.Text = ""
+InputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+InputBox.Font = Enum.Font.Code
+InputBox.TextSize = 13
+InputBox.TextXAlignment = Enum.TextXAlignment.Left
+InputBox.TextYAlignment = Enum.TextYAlignment.Top
+InputBox.Parent = SlideScan2
+
+local BtnScan2 = Instance.new("TextButton")
+BtnScan2.Size = UDim2.new(0.95, 0, 0, 32)
+BtnScan2.Position = UDim2.new(0.025, 0, 0, 148)
+BtnScan2.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+BtnScan2.BorderColor3 = Color3.fromRGB(0, 170, 255)
+BtnScan2.BorderSizePixel = 1
+BtnScan2.Text = "Nhấn để Scan (2) Code trên"
+BtnScan2.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnScan2.Font = Enum.Font.SourceSansBold
+BtnScan2.TextSize = 14
+BtnScan2.Parent = SlideScan2
+
+
+-- ==========================================
+-- TAB 3: KHUNG 1 (OUTPUT) - HIỂN THỊ KẾT QUẢ QUÉT
+-- ==========================================
+local SlideOutput = createSlide("Khung 1 (Output)")
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(0.95, 0, 0, 20)
+OutputLabel.Position = UDim2.new(0.025, 0, 0, 10)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Khung 1: Bảng hiển thị Output phân tích chi tiết lỗ hổng:"
+OutputLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+OutputLabel.Font = Enum.Font.SourceSansBold
+OutputLabel.TextSize = 13
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.Parent = SlideOutput
+
+-- Khung Output chính
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(0.95, 0, 0, 280)
+OutputBox.Position = UDim2.new(0.025, 0, 0, 35)
+OutputBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+OutputBox.BorderColor3 = Color3.fromRGB(0, 170, 255)
+OutputBox.BorderSizePixel = 1
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.Editable = false
+OutputBox.Text = "[Hệ thống sẵn sàng]\n- Hãy dùng 'Scan (1)' hoặc nhập code vào 'Scan (2)' rồi bấm quét để xem phân tích chi tiết tại đây."
+OutputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
+OutputBox.Font = Enum.Font.Code
+OutputBox.TextSize = 12
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Parent = SlideOutput
+
+-- Xử lý logic khi nhấn Scan (2) -> Phân tích lỗ hổng phổ biến và đẩy kết quả sang Khung Output
+BtnScan2.MouseButton1Click:Connect(function()
+    local codeContent = InputBox.Text
+    local analysisResult = "=== KẾT QUẢ QUÉT LỖ HỔNG CODE (SCAN 2) ===\n\n"
+    
+    if codeContent == "" then
+        analysisResult = analysisResult .. "⚠️ Cảnh báo: Khung input đang trống! Vui lòng nhập code để hệ thống phân tích.\n"
+    else
+        local hasVulnerability = false
+        
+        -- Kiểm tra lỗi chỉnh sửa thông số Local (Dame, Máu, Tiền, v.v)
+        if codeContent:lower():find("health") or codeContent:lower():find("dame") or codeContent:lower():find("damage") or codeContent:lower():find("walkspeed") or codeContent:lower():find("jumppower") then
+            analysisResult = analysisResult .. "🔴 [LỖ HỔNG CLIENT-SIDE STATS]: Phát hiện đoạn code can thiệp trực tiếp chỉ số nhân vật ở Client (Máu/Dame/Tốc độ). Hacker có thể dễ dàng sửa đổi các giá trị này nếu không kiểm tra xác thực từ Server.\n\n"
+            hasVulnerability = true
+        end
+        
+        -- Kiểm tra lỗ hổng RemoteEvent (Thiếu kiểm tra bảo mật từ Server / FireServer bừa bãi)
+        if codeContent:lower():find("fireserver") or codeContent:lower():find("remoteevent") or codeContent:lower():find("onserverevent") then
+            analysisResult = analysisResult .. "🔴 [LỖ HỔNG REMOTEEVENT]: Phát hiện gọi hoặc nhận RemoteEvent. Cần kiểm tra xem Server có validate (xác thực) dữ liệu gửi từ Client hay không, tránh việc kẻ xấu gửi gói tin giả mạo để cộng tiền, cộng máu hoặc thực thi lệnh trái phép.\n\n"
+            hasVulnerability = true
+        end
+        
+        -- Kiểm tra lỗ hổng Teleport / Dịch chuyển người chơi khác (Hacker dịch chuyển người chơi)
+        if codeContent:lower():find("cframe") or codeContent:lower():find("position") or codeContent:lower():find("teleport") then
+            analysisResult = analysisResult .. "🟡 [CẢNH BÁO VỊ TRÍ/TELEPORT]: Mã nguồn có can thiệp đến tọa độ (CFrame/Position). Nếu logic này đặt lỏng lẻo ở Client, hacker có thể dịch chuyển (teleport) người chơi khác hoặc dịch chuyển xuyên tường.\n\n"
+            hasVulnerability = true
+        end
+        
+        -- Kiểm tra thao tác với LocalScript hoặc thay đổi môi trường người khác
+        if codeContent:lower():find("localscript") or codeContent:lower():find("playergui") or codeContent:lower():find("backpack") then
+            analysisResult = analysisResult .. "🟡 [THAO TÁC GUI/LOCAL]: Có sự can thiệp vào PlayerGui hoặc Backpack. Kẻ tấn công có thể sửa đổi LocalScript của người khác nếu phân quyền không chặt chẽ.\n\n"
+            hasVulnerability = true
+        end
+        
+        if not hasVulnerability then
+            analysisResult = analysisResult .. "🟢 Không phát hiện mẫu mã độc hoặc lỗ hổng cơ bản rõ ràng nào trong đoạn code này. Tuy nhiên, hãy luôn kiểm tra cẩn thận các logic liên quan đến Server-Client.\n"
+        else
+            analysisResult = analysisResult .. "💡 Khuyến nghị: Hãy chuyển các tính toán quan trọng (như trừ máu, cộng tiền, sát thương) về phía Server (Server-Script) thay vì xử lý hoàn toàn ở Client.\n"
+        end
+    end
+    
+    -- Cập nhật kết quả vào Khung Output và tự động chuyển sang tab Output
+    OutputBox.Text = analysisResult
+    for _, s in pairs(slides) do s.Visible = false end
+    SlideOutput.Visible = true
+end)
+
+-- Hiển thị mặc định Tab Scan 1 khi mở GUI
+SlideScan1.Visible = true
