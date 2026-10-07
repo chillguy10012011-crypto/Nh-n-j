@@ -6,9 +6,9 @@ local PhysicsService = game:GetService("PhysicsService")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
--- 1. Tạo GUI Bật/Tắt Fling
+-- 1. Tạo GUI Bật/Tắt và Nút X (Đóng)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ArmFlingGUI"
+ScreenGui.Name = "ArmFlingGUI_Advanced"
 ScreenGui.ResetOnSpawn = false
 pcall(function()
     ScreenGui.Parent = game:GetService("CoreGui")
@@ -17,34 +17,70 @@ if not ScreenGui.Parent then
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
+-- Khung chứa chính cho gọn
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 160, 0, 90)
+MainFrame.Position = UDim2.new(0, 50, 0, 150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Nút Bật/Tắt Fling
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 140, 0, 50)
-ToggleButton.Position = UDim2.new(0, 50, 0, 150)
+ToggleButton.Size = UDim2.new(0, 140, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
 ToggleButton.Text = "Arm Fling: OFF"
 ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextScaled = true
 ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Active = true
-ToggleButton.Draggable = true
-ToggleButton.Parent = ScreenGui
+ToggleButton.Parent = MainFrame
+
+-- Nút X (Xoá GUI và tắt tính năng)
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 140, 0, 25)
+CloseButton.Position = UDim2.new(0, 10, 0, 55)
+CloseButton.Text = "Đóng GUI (X)"
+CloseButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextScaled = true
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.Parent = MainFrame
 
 local isFlinging = false
 local flingPart = nil
 local connection = nil
 
--- 2. Thiết lập Collision Group để tránh tự va chạm với chính mình
+-- 2. Thiết lập Collision Group để tránh tự va chạm
 local groupName = "AntiSelfCollisionArm"
 pcall(function()
     PhysicsService:CreateCollisionGroup(groupName)
     PhysicsService:CollisionGroupSetCollidable(groupName, groupName, false)
 end)
 
--- 3. Xử lý logic khi bấm nút
+-- Hàm dọn dẹp trạng thái fling
+local function stopFling()
+    isFlinging = false
+    ToggleButton.Text = "Arm Fling: OFF"
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    
+    if flingPart then
+        flingPart:Destroy()
+        flingPart = nil
+    end
+end
+
+-- 3. Xử lý logic khi bấm nút Fling
 ToggleButton.MouseButton1Click:Connect(function()
     isFlinging = not isFlinging
     
-    -- Cập nhật lại Character và tìm tay phải (Hỗ trợ cả R6: "Right Arm" và R15: "RightHand" hoặc "RightLowerArm")
     Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local rightArm = Character:FindFirstChild("RightHand") 
                   or Character:FindFirstChild("Right Arm") 
@@ -66,52 +102,39 @@ ToggleButton.MouseButton1Click:Connect(function()
         flingPart = Instance.new("Part")
         flingPart.Name = "ArmFlingHitbox"
         flingPart.Size = Vector3.new(4, 4, 4)
-        flingPart.Transparency = 1 -- Trong suốt tuyệt đối
-        flingPart.CanCollide = true -- Vẫn gây va chạm vật lý với người khác
-        flingPart.Massless = true   -- Không làm tay bị nặng/trĩu xuống
+        flingPart.Transparency = 1
+        flingPart.CanCollide = true
+        flingPart.Massless = true
         flingPart.CFrame = rightArm.CFrame
         
-        -- Gán CollisionGroup
         pcall(function()
             flingPart.CollisionGroupId = PhysicsService:GetCollisionGroupId(groupName)
         end)
         
         flingPart.Parent = Character
 
-        -- Hàn chặt vào TAY phải bằng WeldConstraint (Server ghi nhận Network Ownership)
-        local weld = Instance.new("WeldConstraint")
-        weld.Part0 = rightArm
-        weld.Part1 = flingPart
-        weld.Parent = flingPart
-
-        -- Vòng lặp xoay phần Part ẩn gắn ở tay với tốc độ cực cao
+        -- Vòng lặp xoay phần Part ẩn đặt cách xa tay một khoảng an toàn (tránh tự bay)
         connection = RunService.Heartbeat:Connect(function()
             if not flingPart or not rightArm or not Character:FindFirstChild("Humanoid") then return end
             
-            -- Tạo góc xoay ngẫu nhiên tốc độ cao
             local randomAngle = CFrame.Angles(
                 math.rad(math.random(-720, 720)),
                 math.rad(math.random(-720, 720)),
                 math.rad(math.random(-720, 720))
             )
             
-            -- Ép dịch chuyển tọa độ liên tục quanh vị trí của tay
-            flingPart.CFrame = rightArm.CFrame * randomAngle
+            -- Đẩy part ra xa một chút bằng safeOffset để không đè vào người bạn
+            local safeOffset = CFrame.new(0, 0, -3)
+            flingPart.CFrame = rightArm.CFrame * safeOffset * randomAngle
         end)
         
     else
-        ToggleButton.Text = "Arm Fling: OFF"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        
-        -- Dọn dẹp kết nối và xóa Part khi tắt
-        if connection then
-            connection:Disconnect()
-            connection = nil
-        end
-        
-        if flingPart then
-            flingPart:Destroy()
-            flingPart = nil
-        end
+        stopFling()
     end
+end)
+
+-- 4. Xử lý nút X để xóa hoàn toàn GUI và tắt hiệu ứng
+CloseButton.MouseButton1Click:Connect(function()
+    stopFling()
+    ScreenGui:Destroy()
 end)
