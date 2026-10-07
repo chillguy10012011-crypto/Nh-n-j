@@ -1,1 +1,109 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/long191910/all-my-roblox-script/refs/heads/main/touchfling.lua"))()
+-- Khởi tạo dịch vụ và người chơi
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local head = character:WaitForChild("Head")
+
+-- Tìm khớp nối cổ (Neck) tùy thuộc vào dạng nhân vật R6 hoặc R15
+local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+local neck = head:FindFirstChild("Neck") or (torso and torso:FindFirstChild("Neck"))
+
+-- Tạo Giao Diện GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ControlPanelGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 220, 0, 50)
+toggleButton.Position = UDim2.new(0.5, -110, 0.1, 0)
+toggleButton.Text = "Bật: Thân & Xoay 54900"
+toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 15
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = toggleButton
+
+local isActive = false
+
+-- Xử lý sự kiện khi bấm nút
+toggleButton.MouseButton1Click:Connect(function()
+    isActive = not isActive
+    
+    if isActive then
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        toggleButton.Text = "Trạng thái: Đang Bật"
+        
+        -- 1. Chuyển Camera theo thân (HumanoidRootPart) thay vì đầu
+        workspace.CurrentCamera.CameraSubject = humanoidRootPart
+        
+        -- 2. Tắt khớp cổ để đầu tự do chuyển động
+        if neck then
+            neck.Enabled = false
+        end
+        
+        -- 3. Tạo AngularVelocity để xoay đầu với vận tốc 54900
+        local attachment = head:FindFirstChild("CustomHeadAttachment")
+        if not attachment then
+            attachment = Instance.new("Attachment")
+            attachment.Name = "CustomHeadAttachment"
+            attachment.Parent = head
+        end
+        
+        local angularVel = head:FindFirstChild("CustomAngularVelocity")
+        if not angularVel then
+            angularVel = Instance.new("AngularVelocity")
+            angularVel.Name = "CustomAngularVelocity"
+            angularVel.Attachment0 = attachment
+            angularVel.MaxTorque = math.huge
+            angularVel.AngularVelocity = Vector3.new(0, 54900, 0) -- Vận tốc xoay
+            angularVel.Parent = head
+        end
+        
+        -- 4. Hàn mềm / Chống tự va chạm với chính cơ thể (Tránh Fling bản thân)
+        -- Sử dụng NoCollisionConstraint để đầu không va chạm với các bộ phận khác trên cơ thể mình
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") and part ~= head then
+                local noColl = part:FindFirstChild("SelfNoCollision")
+                if not noColl then
+                    noColl = Instance.new("NoCollisionConstraint")
+                    noColl.Name = "SelfNoCollision"
+                    noColl.Part0 = head
+                    noColl.Part1 = part
+                    noColl.Parent = head
+                end
+            end
+        end
+        
+    else
+        toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        toggleButton.Text = "Bật: Thân & Xoay 54900"
+        
+        -- Khôi phục trạng thái ban đầu
+        workspace.CurrentCamera.CameraSubject = character:FindFirstChild("Humanoid")
+        
+        if neck then
+            neck.Enabled = true
+        end
+        
+        local angularVel = head:FindFirstChild("CustomAngularVelocity")
+        if angularVel then
+            angularVel:Destroy()
+        end
+        
+        -- Gỡ bỏ bộ lọc va chạm nội bộ
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                local noColl = part:FindFirstChild("SelfNoCollision")
+                if noColl then
+                    noColl:Destroy()
+                end
+            end
+        end
+    end
+end)
