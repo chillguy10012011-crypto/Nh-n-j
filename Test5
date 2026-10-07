@@ -1,0 +1,145 @@
+-- Khởi tạo ScreenGui chính
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+-- Xóa GUI cũ nếu đã tồn tại để tránh trùng lặp
+if CoreGui:FindFirstChild("FlingControllerGUI") then
+    CoreGui.FlingControllerGUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FlingControllerGUI"
+ScreenGui.Parent = CoreGui
+
+-- Khung chính (MainFrame)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 220)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -110)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+MainFrame.BorderSizePixel = 2
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Thanh tiêu đề (TitleBar)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -40, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "Server Fling Controller"
+TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 16
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+-- Nút X (Đóng / Xóa GUI)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Nội dung bên trong GUI
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -30)
+Content.Position = UDim2.new(0, 0, 0, 30)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+-- Trạng thái và các biến điều khiển Fling Part
+local isFlinging = false
+local flingPart = nil
+local connection = nil
+
+-- Nút Bật/Tắt Fling
+local ToggleFlingBtn = Instance.new("TextButton")
+ToggleFlingBtn.Size = UDim2.new(0, 260, 0, 50)
+ToggleFlingBtn.Position = UDim2.new(0.5, -130, 0.5, -25)
+ToggleFlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleFlingBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ToggleFlingBtn.BorderSizePixel = 1
+ToggleFlingBtn.Text = "Trạng thái: TẮT"
+ToggleFlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+ToggleFlingBtn.Font = Enum.Font.SourceSansBold
+ToggleFlingBtn.TextSize = 18
+ToggleFlingBtn.Parent = Content
+
+-- Hàm xử lý logic Bật / Tắt Fling
+ToggleFlingBtn.MouseButton1Click:Connect(function()
+    isFlinging = not isFlinging
+    
+    if isFlinging then
+        ToggleFlingBtn.Text = "Trạng thái: BẬT"
+        ToggleFlingBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        local character = LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = character.HumanoidRootPart
+        
+        -- Tạo Part ẩn mô phỏng Server-side/Replicated qua cấu trúc Character
+        flingPart = Instance.new("Part")
+        flingPart.Name = "ServerFlingPart"
+        flingPart.Size = Vector3.new(4, 4, 4)
+        flingPart.Transparency = 1 -- Tàng hình nhưng vẫn tồn tại vật lý
+        flingPart.CanCollide = true -- Bật va chạm để tương tác với người khác
+        flingPart.Massless = true
+        flingPart.Position = hrp.Position
+        
+        -- Chống tự va chạm với nhân vật của chính mình (Tránh tự fling bản thân)
+        local noCollisionConstraint = Instance.new("NoCollisionConstraint")
+        noCollisionConstraint.Part0 = flingPart
+        noCollisionConstraint.Part1 = hrp
+        noCollisionConstraint.Parent = flingPart
+        
+        -- Hàn chặt vào HumanoidRootPart để Server công nhận và đồng bộ vị trí
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = hrp
+        weld.Part1 = flingPart
+        weld.Parent = flingPart
+        
+        flingPart.Parent = character
+        
+        -- Vòng lặp tăng tốc độ quay cực mạnh (Angular Velocity) để tạo lực Fling
+        local RunService = game:GetService("RunService")
+        connection = RunService.Heartbeat:Connect(function()
+            if character and character:FindFirstChild("HumanoidRootPart") and flingPart then
+                -- Ép vận tốc quay và góc xoay cực lớn để đẩy văng bất cứ ai chạm phải
+                flingPart.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
+                flingPart.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+            end
+        end)
+        
+    else
+        ToggleFlingBtn.Text = "Trạng thái: TẮT"
+        ToggleFlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        
+        -- Ngắt kết nối vòng lặp
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        
+        -- Xóa bỏ Part ẩn
+        if flingPart then
+            flingPart:Destroy()
+            flingPart = nil
+        end
+    end
+end)
