@@ -1,0 +1,171 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- Xóa GUI cũ nếu đã tồn tại để tránh trùng lặp
+if CoreGui:FindFirstChild("SoftFlingGUI") then
+    CoreGui.SoftFlingGUI:Destroy()
+end
+
+-- Tạo giao diện GUI chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SoftFlingGUI"
+ScreenGui.ResetOnSpawn = false
+
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 120)
+MainFrame.Position = UDim2.new(0.5, -110, 0.4, -60)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 8)
+UICornerMain.Parent = MainFrame
+
+-- Tiêu đề và Nút X (Đóng / Xóa GUI)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -30, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "Soft Joint Fling"
+TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 14
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 14
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Nút Bật/Tắt Fling
+local FlingBtn = Instance.new("TextButton")
+FlingBtn.Size = UDim2.new(1, -20, 0, 50)
+FlingBtn.Position = UDim2.new(0, 10, 0, 45)
+FlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+FlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+FlingBtn.Font = Enum.Font.SourceSansBold
+FlingBtn.TextSize = 16
+FlingBtn.Text = "Fling (Soft): TẮT"
+FlingBtn.Parent = MainFrame
+
+local CornerBtn = Instance.new("UICorner")
+CornerBtn.CornerRadius = UDim.new(0, 6)
+CornerBtn.Parent = FlingBtn
+
+local isFlinging = false
+local flingPart = nil
+local connection = nil
+
+FlingBtn.MouseButton1Click:Connect(function()
+    isFlinging = not isFlinging
+    
+    if isFlinging then
+        FlingBtn.Text = "Fling (Soft): BẬT"
+        FlingBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        FlingBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+        
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = char.HumanoidRootPart
+        
+        -- Tạo Part ẩn làm hitbox gây lực
+        flingPart = Instance.new("Part")
+        flingPart.Name = "SoftFlingPart"
+        flingPart.Size = Vector3.new(4, 4, 4)
+        flingPart.Transparency = 1 -- Tàng hình với người khác
+        flingPart.CanCollide = true -- Vẫn có va chạm để fling người khác
+        flingPart.Massless = true
+        flingPart.Position = hrp.Position
+        
+        -- Chống tự va chạm với chính nhân vật của bạn
+        local noCol = Instance.new("NoCollisionConstraint")
+        noCol.Part0 = flingPart
+        noCol.Part1 = hrp
+        noCol.Parent = flingPart
+        
+        -- Tạo khớp nối mềm bằng Attachment kết hợp AlignPosition và AlignOrientation
+        local att0 = Instance.new("Attachment", hrp)
+        att0.Name = "FlingAttach0"
+        
+        local att1 = Instance.new("Attachment", flingPart)
+        att1.Name = "FlingAttach1"
+        
+        local alignPos = Instance.new("AlignPosition")
+        alignPos.Attachment0 = att1
+        alignPos.Attachment1 = att0
+        alignPos.RigidityEnabled = false -- Khớp mềm có độ đàn hồi, không bị cứng nhắc như Weld
+        alignPos.MaxForce = 25000
+        alignPos.Parent = flingPart
+        
+        local alignOri = Instance.new("AlignOrientation")
+        alignOri.Attachment0 = att1
+        alignOri.Attachment1 = att0
+        alignOri.RigidityEnabled = false
+        alignOri.MaxTorque = 25000
+        alignOri.Parent = flingPart
+        
+        flingPart.Parent = char
+        
+        -- Vòng lặp liên tục gia tăng vận tốc tuyến tính và vận tốc góc cực lớn cho part ẩn
+        connection = RunService.Heartbeat:Connect(function()
+            if char and char:FindFirstChild("HumanoidRootPart") and flingPart then
+                flingPart.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
+                flingPart.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+            end
+        end)
+    else
+        FlingBtn.Text = "Fling (Soft): TẮT"
+        FlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        FlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        
+        -- Ngắt kết nối vòng lặp
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        
+        -- Xóa bỏ Part ẩn để tránh lag
+        if flingPart then
+            flingPart:Destroy()
+            flingPart = nil
+        end
+        
+        -- Dọn dẹp các attachment phụ trên nhân vật
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            for _, child in pairs(char.HumanoidRootPart:GetChildren()) do
+                if child.Name == "FlingAttach0" then
+                    child:Destroy()
+                end
+            end
+        end
+    end
+end)
