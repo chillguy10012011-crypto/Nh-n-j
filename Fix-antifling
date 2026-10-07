@@ -1,91 +1,41 @@
--- Script Path: game:GetService("Players").getbond1.PlayerScripts.universal.vfx.clientEffect
--- Took 0.51s to decompile.
--- Executor: Delta (1.1.740.931)
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
--- Decompiled using ByteFall
--- discord.gg/pHTnqmmWzk
-local replicatedStorage: ReplicatedStorage = game:GetService("ReplicatedStorage")
-local v2 = require(replicatedStorage.Framework)()
-local replicatedStorage2: ReplicatedStorage = game:GetService("ReplicatedStorage")
-local v4 = v2.library.Network()
-local v5 = v2.common.debris()
-local forgeVFX = require(replicatedStorage2.clientModules.ForgeVFX)
-local clientVFX = require(replicatedStorage2.clientModules.clientVFX)
-local localClient = replicatedStorage2.Remotes.localClient
-local allClients = replicatedStorage2.Remotes.allClients
-local clientsInRange = replicatedStorage2.Remotes.clientsInRange
-local LocalPlayer = game.Players.LocalPlayer
-local t1: {[any]: any} = {}
+-- Ngưỡng vận tốc tối đa khi đứng yên hoặc không chủ động lướt
+local MAX_SAFE_SPEED = 40
 
-forgeVFX.init()
-
-local function abilityActivated(p1, p2, _)
-    local t2 = t1[p1]
-
-    if not t2 then
-        t2 = {}
-        t1[p1] = t2
-        p1.Destroying:Connect(function()
-            t1[p1] = nil
-        end)
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    
+    if hrp and humanoid then
+        local currentVelocity = hrp.AssemblyLinearVelocity
+        local horizontalSpeed = Vector3.new(currentVelocity.X, 0, currentVelocity.Z).Magnitude
+        
+        -- Kiểm tra xem người chơi có đang thao tác nút di chuyển (PC hoặc Điện thoại) hay không
+        local isMovingInput = humanoid.MoveDirection.Magnitude > 0
+        
+        if not isMovingInput then
+            -- Trường hợp 1: Đứng yên hoặc bị đánh lén fling mà không bấm nút di chuyển
+            if horizontalSpeed > MAX_SAFE_SPEED then
+                -- Triệt tiêu ngay lập tức lực văng ngang, giữ lại lực rơi trục Y để tránh bị lơ lửng
+                hrp.AssemblyLinearVelocity = Vector3.new(0, currentVelocity.Y, 0)
+                hrp.RotVelocity = Vector3.new(0, 0, 0)
+            end
+        else
+            -- Trường hợp 2: Bạn đang chủ động bấm di chuyển/chạy, cho phép vận tốc tự nhiên 
+            -- nhưng vẫn chặn các đỉnh fling quá cực đoan (> 120) để bảo vệ nhân vật
+            if horizontalSpeed > 120 then
+                hrp.AssemblyLinearVelocity = Vector3.new(
+                    currentVelocity.X * 0.5,
+                    currentVelocity.Y,
+                    currentVelocity.Z * 0.5
+                )
+            end
+        end
     end
-
-    table.insert(t2, p2)
-    v5.cleared(function()
-        local v35 = table.find(t2, p2)
-
-        if v35 then
-            table.remove(t2, v35)
-        end
-    end)
-end
-
-localClient.OnClientEvent:Connect(function(p5, ...)
-    task.spawn(function(...)
-        local v36, v37 = clientVFX:Fire(LocalPlayer, p5, ...)
-
-        if v37 then
-            abilityActivated(LocalPlayer.Character, v37)
-
-            return
-        end
-
-        if getfenv(v36)._debris_init then
-            warn("did not return thread in " .. p5)
-        end
-    end, ...)
-end)
-allClients.OnClientEvent:Connect(function(p6, p7, ...)
-    task.spawn(function(...)
-        local v38, v39 = clientVFX:Fire(p6, p7, ...)
-
-        if v39 then
-            abilityActivated(p6, v39)
-
-            return
-        end
-
-        if getfenv(v38)._debris_init then
-            warn("did not return thread in " .. p7)
-        end
-    end, ...)
-end)
-clientsInRange.OnClientEvent:Connect(function(p8, p9, p10, ...)
-    task.spawn(function(...)
-        if (LocalPlayer.Character.PrimaryPart.Position - p8.PrimaryPart.Position).Magnitude <= p10 then
-            local v40, v41 = clientVFX:Fire(p8, p9, ...)
-
-            if v41 then
-                abilityActivated(p8, v41)
-
-                return
-            end
-
-            if getfenv(v40)._debris_init then
-                warn("did not return thread in " .. p9)
-            end
-
-            return
-        end
-    end, ...)
 end)
