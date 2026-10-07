@@ -1,140 +1,90 @@
--- Khởi tạo các dịch vụ cần thiết
+-- Tạo GUI trên Roblox Executor
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local PhysicsService = game:GetService("PhysicsService")
-
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- 1. Tạo GUI Bật/Tắt và Nút X (Đóng)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ArmFlingGUI_Advanced"
-ScreenGui.ResetOnSpawn = false
-pcall(function()
-    ScreenGui.Parent = game:GetService("CoreGui")
-end)
-if not ScreenGui.Parent then
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- Xóa GUI cũ nếu đã tồn tại để tránh bị trùng lặp
+if PlayerGui:FindFirstChild("WeldConstraintGUI") then
+    PlayerGui.WeldConstraintGUI:Destroy()
 end
 
--- Khung chứa chính cho gọn
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WeldConstraintGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+-- Khung chính của GUI
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 160, 0, 90)
-MainFrame.Position = UDim2.new(0, 50, 0, 150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-MainFrame.BorderSizePixel = 0
+MainFrame.Size = UDim2.new(0, 220, 0, 110)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -55)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+MainFrame.BorderSizePixel = 2
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Nút Bật/Tắt Fling
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 140, 0, 40)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.Text = "Arm Fling: OFF"
-ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.TextScaled = true
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Parent = MainFrame
+-- Tiêu đề GUI
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "WeldConstraint Tool"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.Parent = MainFrame
 
--- Nút X (Xoá GUI và tắt tính năng)
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0, 140, 0, 25)
-CloseButton.Position = UDim2.new(0, 10, 0, 55)
-CloseButton.Text = "Đóng GUI (X)"
-CloseButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.TextScaled = true
-CloseButton.Font = Enum.Font.SourceSansBold
-CloseButton.Parent = MainFrame
+-- Nút Bật/Tắt
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.85, 0, 0, 45)
+ToggleBtn.Position = UDim2.new(0.075, 0, 0.4, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
+ToggleBtn.Text = "Trạng thái: TẮT"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 85, 85)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 15
+ToggleBtn.Parent = MainFrame
 
-local isFlinging = false
-local flingPart = nil
-local connection = nil
+local isEnabled = false
+local spawnedPart = nil
 
--- 2. Thiết lập Collision Group để tránh tự va chạm
-local groupName = "AntiSelfCollisionArm"
-pcall(function()
-    PhysicsService:CreateCollisionGroup(groupName)
-    PhysicsService:CollisionGroupSetCollidable(groupName, groupName, false)
-end)
-
--- Hàm dọn dẹp trạng thái fling
-local function stopFling()
-    isFlinging = false
-    ToggleButton.Text = "Arm Fling: OFF"
-    ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleBtn.MouseButton1Click:Connect(function()
+    isEnabled = not isEnabled
     
-    if connection then
-        connection:Disconnect()
-        connection = nil
-    end
+    local character = LocalPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
     
-    if flingPart then
-        flingPart:Destroy()
-        flingPart = nil
-    end
-end
-
--- 3. Xử lý logic khi bấm nút Fling
-ToggleButton.MouseButton1Click:Connect(function()
-    isFlinging = not isFlinging
-    
-    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local rightArm = Character:FindFirstChild("RightHand") 
-                  or Character:FindFirstChild("Right Arm") 
-                  or Character:FindFirstChild("RightLowerArm")
-    
-    if isFlinging then
-        if not rightArm then
-            ToggleButton.Text = "Không tìm thấy tay!"
-            task.wait(1)
-            ToggleButton.Text = "Arm Fling: OFF"
-            isFlinging = false
-            return
+    if isEnabled then
+        ToggleBtn.Text = "Trạng thái: BẬT"
+        ToggleBtn.TextColor3 = Color3.fromRGB(85, 255, 85)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+        
+        if hrp then
+            -- Tạo Part mới gắn vào nhân vật
+            spawnedPart = Instance.new("Part")
+            spawnedPart.Name = "WeldedPart"
+            spawnedPart.Size = Vector3.new(4, 4, 4)
+            spawnedPart.CFrame = hrp.CFrame
+            spawnedPart.CanCollide = false -- Tránh kẹt nhân vật của bạn
+            spawnedPart.Transparency = 0.5 -- Chỉnh thành 1 nếu muốn tàng hình hoàn toàn
+            spawnedPart.Parent = character
+            
+            -- Dùng WeldConstraint để hàn Part vào HumanoidRootPart
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = hrp
+            weld.Part1 = spawnedPart
+            weld.Parent = spawnedPart
         end
-        
-        ToggleButton.Text = "Arm Fling: ON"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        
-        -- Tạo Part ẩn
-        flingPart = Instance.new("Part")
-        flingPart.Name = "ArmFlingHitbox"
-        flingPart.Size = Vector3.new(4, 4, 4)
-        flingPart.Transparency = 1
-        flingPart.CanCollide = true
-        flingPart.Massless = true
-        flingPart.CFrame = rightArm.CFrame
-        
-        pcall(function()
-            flingPart.CollisionGroupId = PhysicsService:GetCollisionGroupId(groupName)
-        end)
-        
-        flingPart.Parent = Character
-
-        -- Vòng lặp xoay phần Part ẩn đặt cách xa tay một khoảng an toàn (tránh tự bay)
-        connection = RunService.Heartbeat:Connect(function()
-            if not flingPart or not rightArm or not Character:FindFirstChild("Humanoid") then return end
-            
-            local randomAngle = CFrame.Angles(
-                math.rad(math.random(-720, 720)),
-                math.rad(math.random(-720, 720)),
-                math.rad(math.random(-720, 720))
-            )
-            
-            -- Đẩy part ra xa một chút bằng safeOffset để không đè vào người bạn
-            local safeOffset = CFrame.new(0, 0, -3)
-            flingPart.CFrame = rightArm.CFrame * safeOffset * randomAngle
-        end)
-        
     else
-        stopFling()
+        ToggleBtn.Text = "Trạng thái: TẮT"
+        ToggleBtn.TextColor3 = Color3.fromRGB(255, 85, 85)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        
+        -- Xóa Part khi tắt để tránh gây lag
+        if spawnedPart then
+            spawnedPart:Destroy()
+            spawnedPart = nil
+        end
     end
-end)
-
--- 4. Xử lý nút X để xóa hoàn toàn GUI và tắt hiệu ứng
-CloseButton.MouseButton1Click:Connect(function()
-    stopFling()
-    ScreenGui:Destroy()
 end)
