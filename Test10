@@ -1,0 +1,94 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- --- TỰ ĐỘNG TẠO GIAO DIỆN (SCREEN GUI & NÚT) ---
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AntiDeleteGui"
+screenGui.ResetOnSpawn = false -- Giữ GUI không bị mất khi nhân vật chết/respawn
+screenGui.Parent = playerGui
+
+-- Tạo nút bật/tắt chính
+local mainButton = Instance.new("TextButton")
+mainButton.Name = "MainButton"
+mainButton.Size = UDim2.new(0, 160, 0, 50)
+mainButton.Position = UDim2.new(0, 50, 0, 50) -- Đặt ở góc trên bên trái màn hình
+mainButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Mặc định là OFF (Đỏ)
+mainButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+mainButton.Text = "Anti-Delete: OFF"
+mainButton.TextSize = 16
+mainButton.Font = Enum.Font.SourceSansBold
+mainButton.Parent = screenGui
+
+-- Bo tròn góc nút chính cho đẹp (tùy chọn)
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = mainButton
+
+-- Tạo nút "X" để đóng GUI ở góc trên bên phải của nút chính
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 24, 0, 24)
+closeButton.Position = UDim2.new(1, -22, 0, -2) -- Nằm sát góc trên bên phải
+closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Text = "X"
+closeButton.TextSize = 14
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.Parent = mainButton
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 4)
+closeCorner.Parent = closeButton
+
+-- --- LOGIC ANTI-DELETE ---
+local antiDeleteEnabled = false
+
+local function setupAntiDelete(character)
+	local humanoid = character:WaitForChild("Humanoid")
+	
+	humanoid.Died:Connect(function()
+		if not antiDeleteEnabled then return end
+		
+		print("[Anti-Delete] Phát hiện nhân vật chết, đang tiến hành chặn...")
+		task.wait()
+		if humanoid then
+			humanoid.Health = humanoid.MaxHealth
+		end
+	end)
+end
+
+-- Lắng nghe nhân vật mới mỗi khi respawn
+player.CharacterAdded:Connect(function(character)
+	if antiDeleteEnabled then
+		setupAntiDelete(character)
+	end
+end)
+
+-- --- SỰ KIỆN BẤM NÚT CHÍNH (BẬT/TẮT) ---
+mainButton.MouseButton1Click:Connect(function()
+	antiDeleteEnabled = not antiDeleteEnabled
+	
+	if antiDeleteEnabled then
+		mainButton.Text = "Anti-Delete: ON"
+		mainButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Xanh
+		
+		if player.Character then
+			setupAntiDelete(player.Character)
+		end
+		print("Đã BẬT tính năng chặn xóa character.")
+	else
+		mainButton.Text = "Anti-Delete: OFF"
+		mainButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Đỏ
+		print("Đã TẮT tính năng chặn xóa character.")
+	end
+end)
+
+-- --- SỰ KIỆN BẤM NÚT X (XÓA GUI) ---
+closeButton.MouseButton1Click:Connect(function()
+	print("Đang đóng và xóa GUI...")
+	antiDeleteEnabled = false
+	if screenGui then
+		screenGui:Destroy()
+	end
+end)
