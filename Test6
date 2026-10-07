@@ -1,0 +1,201 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- // 1. XÓA GUI CŨ NẾU ĐÃ TỒN TẠI //
+if CoreGui:FindFirstChild("CombinedFlingControllerGUI") then
+    CoreGui.CombinedFlingControllerGUI:Destroy()
+end
+if LocalPlayer.PlayerGui:FindFirstChild("CombinedFlingControllerGUI") then
+    LocalPlayer.PlayerGui.CombinedFlingControllerGUI:Destroy()
+end
+
+-- // 2. TẠO GIAO DIỆN GUI CHÍNH //
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CombinedFlingControllerGUI"
+ScreenGui.ResetOnSpawn = false
+
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -110, 0.4, -80)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 10)
+UICornerMain.Parent = MainFrame
+
+-- Tiêu đề & Nút X (Đóng GUI)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -30, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "Fling & Anti-Fling Panel"
+TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 14
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 14
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- // 3. NÚT FLING (Tạo part ẩn + WeldConstraint + Quay tốc độ cao) //
+local ToggleFlingBtn = Instance.new("TextButton")
+ToggleFlingBtn.Size = UDim2.new(1, -20, 0, 45)
+ToggleFlingBtn.Position = UDim2.new(0, 10, 0, 45)
+ToggleFlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleFlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+ToggleFlingBtn.Font = Enum.Font.SourceSansBold
+ToggleFlingBtn.TextSize = 15
+ToggleFlingBtn.Text = "Fling: TẮT"
+ToggleFlingBtn.Parent = MainFrame
+
+local CornerFling = Instance.new("UICorner")
+CornerFling.CornerRadius = UDim.new(0, 6)
+CornerFling.Parent = ToggleFlingBtn
+
+local isFlinging = false
+local flingPart = nil
+local flingConnection = nil
+
+ToggleFlingBtn.MouseButton1Click:Connect(function()
+    isFlinging = not isFlinging
+    
+    if isFlinging then
+        ToggleFlingBtn.Text = "Fling: BẬT"
+        ToggleFlingBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        ToggleFlingBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+        
+        local character = LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = character.HumanoidRootPart
+        
+        -- Tạo Part ẩn (Transparency = 1, CanCollide = true) để người khác không thấy nhưng vẫn chạm được
+        flingPart = Instance.new("Part")
+        flingPart.Name = "ServerFlingPart"
+        flingPart.Size = Vector3.new(4, 4, 4)
+        flingPart.Transparency = 1
+        flingPart.CanCollide = true
+        flingPart.Massless = true
+        flingPart.Position = hrp.Position
+        
+        -- Chống tự va chạm với chính mình
+        local noCollision = Instance.new("NoCollisionConstraint")
+        noCollision.Part0 = flingPart
+        noCollision.Part1 = hrp
+        noCollision.Parent = flingPart
+        
+        -- Dùng WeldConstraint để hàn vào nhân vật (Server công nhận)
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = hrp
+        weld.Part1 = flingPart
+        weld.Parent = flingPart
+        
+        flingPart.Parent = character
+        
+        -- Vòng lặp tăng vận tốc góc và vận tốc tuyến tính cực nhanh
+        flingConnection = RunService.Heartbeat:Connect(function()
+            if character and character:FindFirstChild("HumanoidRootPart") and flingPart then
+                flingPart.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
+                flingPart.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+            end
+        end)
+    else
+        ToggleFlingBtn.Text = "Fling: TẮT"
+        ToggleFlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        ToggleFlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        
+        if flingConnection then
+            flingConnection:Disconnect()
+            flingConnection = nil
+        end
+        
+        if flingPart then
+            flingPart:Destroy()
+            flingPart = nil
+        end
+    end
+end)
+
+-- // 4. NÚT ANTI-FLING (Kháng văng, kìm hãm tốc độ khi không di chuyển) //
+getgenv().AntiFlingEnabled = false
+local MAX_SAFE_SPEED = 40
+
+local ToggleAntiFlingBtn = Instance.new("TextButton")
+ToggleAntiFlingBtn.Size = UDim2.new(1, -20, 0, 35)
+ToggleAntiFlingBtn.Position = UDim2.new(0, 10, 0, 105)
+ToggleAntiFlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleAntiFlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+ToggleAntiFlingBtn.Font = Enum.Font.SourceSansBold
+ToggleAntiFlingBtn.TextSize = 14
+ToggleAntiFlingBtn.Text = "Anti-Fling: TẮT"
+ToggleAntiFlingBtn.Parent = MainFrame
+
+local CornerAnti = Instance.new("UICorner")
+CornerAnti.CornerRadius = UDim.new(0, 6)
+CornerAnti.Parent = ToggleAntiFlingBtn
+
+ToggleAntiFlingBtn.MouseButton1Click:Connect(function()
+    getgenv().AntiFlingEnabled = not getgenv().AntiFlingEnabled
+    if getgenv().AntiFlingEnabled then
+        ToggleAntiFlingBtn.Text = "Anti-Fling: BẬT"
+        ToggleAntiFlingBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        ToggleAntiFlingBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    else
+        ToggleAntiFlingBtn.Text = "Anti-Fling: TẮT"
+        ToggleAntiFlingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        ToggleAntiFlingBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    end
+end)
+
+-- Vòng lặp kiểm tra Anti-Fling ngầm
+RunService.Heartbeat:Connect(function()
+    if not getgenv().AntiFlingEnabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    
+    if hrp and humanoid then
+        local currentVelocity = hrp.AssemblyLinearVelocity
+        local horizontalSpeed = Vector3.new(currentVelocity.X, 0, currentVelocity.Z).Magnitude
+        local isMovingInput = humanoid.MoveDirection.Magnitude > 0
+        
+        -- Nếu không chủ động thao tác nút di chuyển mà tốc độ vọt quá ngưỡng -> Kháng lực văng
+        if not isMovingInput and horizontalSpeed > MAX_SAFE_SPEED then
+            hrp.AssemblyLinearVelocity = Vector3.new(0, currentVelocity.Y, 0)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
