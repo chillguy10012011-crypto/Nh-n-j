@@ -1,71 +1,106 @@
+-- Khởi tạo các dịch vụ cơ bản
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local PhysicsService = game:GetService("PhysicsService")
+
 local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
--- Tạo GUI đơn giản
+-- 1. Tạo GUI Bật/Tắt Fling
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlingGUI"
+ScreenGui.Name = "FlingControlGUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- Sử dụng CoreGui nếu trình thực thi hỗ trợ, nếu không chuyển sang PlayerGui
+pcall(function()
+    ScreenGui.Parent = game:GetService("CoreGui")
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 
-local TextButton = Instance.new("TextButton")
-TextButton.Size = UDim2.new(0, 140, 0, 50)
-TextButton.Position = UDim2.new(0.05, 0, 0.1, 0)
-TextButton.Text = "Fling: OFF"
-TextButton.TextSize = 18
-TextButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextButton.Parent = ScreenGui
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleFlingButton"
+ToggleButton.Size = UDim2.new(0, 140, 0, 50)
+ToggleButton.Position = UDim2.new(0, 50, 0, 150)
+ToggleButton.Text = "Fling: OFF"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextScaled = true
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Parent = ScreenGui
 
-local active = false
+-- Làm nút có thể kéo thả nhẹ cho tiện
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+
+local isFlinging = false
 local flingPart = nil
 local connection = nil
 
-TextButton.MouseButton1Click:Connect(function()
-    active = not active
+-- 2. Thiết lập Collision Group để tránh tự va chạm với chính mình
+local groupName = "AntiSelfCollision"
+pcall(function()
+    PhysicsService:CreateCollisionGroup(groupName)
+    -- Tắt va chạm giữa các vật thể cùng nhóm (hoặc bạn có thể tinh chỉnh theo ý muốn)
+    PhysicsService:CollisionGroupSetCollidable(groupName, groupName, false)
+end)
+
+-- 3. Xử lý logic khi bấm nút
+ToggleButton.MouseButton1Click:Connect(function()
+    isFlinging = not isFlinging
     
-    if active then
-        TextButton.Text = "Fling: ON"
-        TextButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    if isFlinging then
+        ToggleButton.Text = "Fling: ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
         
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            local hrp = character.HumanoidRootPart
+        -- Tạo Part ẩn
+        flingPart = Instance.new("Part")
+        flingPart.Name = "FlingHitbox"
+        flingPart.Size = Vector3.new(4, 4, 4)
+        flingPart.Transparency = 1 -- Hoàn toàn trong suốt (người khác không thấy)
+        flingPart.CanCollide = true -- Vẫn có va chạm với người khác
+        flingPart.Massless = true   -- Không làm nhân vật bị nặng thêm
+        flingPart.CFrame = RootPart.CFrame
+        
+        -- Gán CollisionGroup
+        pcall(function()
+            flingPart.CollisionGroupId = PhysicsService:GetCollisionGroupId(groupName)
+        end)
+        
+        flingPart.Parent = Character
+
+        -- Hàn chặt vào HumanoidRootPart bằng WeldConstraint để Server ghi nhận Network Ownership
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = RootPart
+        weld.Part1 = flingPart
+        weld.Parent = flingPart
+
+        -- Vòng lặp liên tục thay đổi góc xoay cực nhanh để kích hoạt lỗi Fling vật lý
+        connection = RunService.Heartbeat:Connect(function()
+            if not flingPart or not RootPart or not Character:FindFirstChild("Humanoid") then return end
             
-            -- Tạo Part ẩn nhưng vẫn có va chạm vật lý
-            flingPart = Instance.new("Part")
-            flingPart.Name = "FlingPart"
-            flingPart.Size = Vector3.new(3, 3, 3)
-            flingPart.Transparency = 1 -- Người chơi khác không nhìn thấy
-            flingPart.CanCollide = true -- Vẫn chạm và tác động vật lý lên người khác
-            flingPart.Massless = true
-            flingPart.CFrame = hrp.CFrame
-            flingPart.Parent = character
+            -- Tạo giá trị xoay ngẫu nhiên tốc độ cao
+            local randomAngle = CFrame.Angles(
+                math.rad(math.random(-720, 720)),
+                math.rad(math.random(-720, 720)),
+                math.rad(math.random(-720, 720))
+            )
             
-            -- Dùng WeldConstraint để hàn vào nhân vật (giúp server công nhận quyền sở hữu và đồng bộ)
-            local weld = Instance.new("WeldConstraint")
-            weld.Part0 = hrp
-            weld.Part1 = flingPart
-            weld.Parent = flingPart
-            
-            -- Liên tục thay đổi vận tốc tuyến tính và vận tốc góc với giá trị cực lớn mỗi frame
-            connection = RunService.Heartbeat:Connect(function()
-                if flingPart and flingPart.Parent and hrp and hrp.Parent then
-                    -- Ép vận tốc bay và xoay ngẫu nhiên cực mạnh để đánh lừa engine vật lý
-                    flingPart.AssemblyLinearVelocity = Vector3.new(math.random(-25000, 25000), 25000, math.random(-25000, 25000))
-                    flingPart.AssemblyAngularVelocity = Vector3.new(math.random(-25000, 25000), 25000, math.random(-25000, 25000))
-                end
-            end)
-        end
+            -- Ép dịch chuyển tọa độ liên tục tạo xung lượng va chạm ảo cực mạnh
+            flingPart.CFrame = RootPart.CFrame * randomAngle
+        end)
+        
     else
-        TextButton.Text = "Fling: OFF"
-        TextButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        ToggleButton.Text = "Fling: OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         
-        -- Dừng vòng lặp và xóa Part khi tắt
+        -- Dọn dẹp kết nối và hủy Part ẩn khi tắt
         if connection then
             connection:Disconnect()
             connection = nil
         end
+        
         if flingPart then
             flingPart:Destroy()
             flingPart = nil
