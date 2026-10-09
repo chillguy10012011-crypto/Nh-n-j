@@ -1,106 +1,99 @@
--- Khởi tạo dịch vụ và người chơi
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
--- Xóa GUI cũ nếu tồn tại
-if PlayerGui:FindFirstChild("FreePartGui") then
-    PlayerGui.FreePartGui:Destroy()
-end
-
--- Tạo ScreenGui
+-- Tạo ScreenGui chính
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FreePartGui"
+ScreenGui.Name = "CustomExecutorGUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
+ScreenGui.Parent = game.CoreGui -- Hoặc game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Tạo khung chính (MainFrame)
+-- Khung chính chứa toàn bộ giao diện
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 130)
-MainFrame.Position = UDim2.new(0.5, -120, 0.5, -65)
+MainFrame.Size = UDim2.new(0, 520, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -260, 0.5, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
-MainFrame.BorderSizePixel = 2
+MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Draggable = true -- Cho phép kéo thả bảng GUI
 MainFrame.Parent = ScreenGui
 
 -- Tiêu đề GUI
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundTransparency = 1
-Title.Text = "Free Part Controller"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "Custom Executor Interface"
+Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 16
 Title.Parent = MainFrame
 
--- Nút Bật/Tắt
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.85, 0, 0, 50)
-ToggleBtn.Position = UDim2.new(0.075, 0, 0.45, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-ToggleBtn.BorderColor3 = Color3.fromRGB(0, 170, 255)
-ToggleBtn.Text = "Trạng thái: TẮT"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 85, 85)
-ToggleBtn.Font = Enum.Font.SourceSansBold
-ToggleBtn.TextSize = 16
-ToggleBtn.Parent = MainFrame
+-- 1. Khung nhập code (TextBox bên trái)
+local CodeBox = Instance.new("TextBox")
+CodeBox.Size = UDim2.new(0, 240, 0, 220)
+CodeBox.Position = UDim2.new(0, 10, 0, 40)
+CodeBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+CodeBox.TextColor3 = Color3.fromRGB(0, 255, 128)
+CodeBox.PlaceholderText = "-- Nhập code Lua của bạn vào đây..."
+CodeBox.Text = ""
+CodeBox.TextSize, CodeBox.TextXAlignment, CodeBox.TextYAlignment = 13, Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
+CodeBox.ClearTextOnFocus = false
+CodeBox.MultiLine = true
+CodeBox.Parent = MainFrame
 
--- Biến trạng thái
-local isEnabled = false
-local freePart = nil
-local connection = nil
+-- Nút Execute (nằm phía dưới khung nhập code)
+local ExecuteBtn = Instance.new("TextButton")
+ExecuteBtn.Size = UDim2.new(0, 240, 0, 35)
+ExecuteBtn.Position = UDim2.new(0, 10, 0, 270)
+ExecuteBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+ExecuteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecuteBtn.Text = "EXECUTE"
+ExecuteBtn.TextSize = 14
+ExecuteBtn.Font = Enum.Font.SourceSansBold
+ExecuteBtn.Parent = MainFrame
 
-ToggleBtn.MouseButton1Click:Connect(function()
-    isEnabled = not isEnabled
-    
-    local character = LocalPlayer.Character
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    
-    if isEnabled then
-        ToggleBtn.Text = "Trạng thái: BẬT"
-        ToggleBtn.TextColor3 = Color3.fromRGB(85, 255, 85)
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-        
-        if hrp then
-            -- 1. Tạo một Part tự do (Anchored = false) trong Workspace
-            freePart = Instance.new("Part")
-            freePart.Name = "ControlledFreePart"
-            freePart.Size = Vector3.new(3, 3, 3)
-            freePart.CFrame = hrp.CFrame * CFrame.new(0, 5, 0)
-            freePart.Anchored = false -- Part tự do theo yêu cầu
-            freePart.CanCollide = true
-            freePart.Transparency = 0.3 -- Chỉnh thành 1 nếu muốn ẩn hoàn toàn
-            freePart.Parent = workspace
-            
-            -- 2. Vòng lặp điều khiển Part tự do chạy theo ý muốn hoặc gia tăng vận tốc trên Executor
-            connection = RunService.Heartbeat:Connect(function()
-                if freePart and freePart.Parent and hrp then
-                    -- Bạn có thể viết code điều khiển phần Part tự do ở đây (ví dụ: bám theo hướng nhìn hoặc bay lượn)
-                    -- Đảm bảo Server công nhận thông qua Network Ownership của Client
-                    pcall(function()
-                        freePart:SetNetworkOwner(LocalPlayer)
-                    end)
-                end
-            end)
-        end
-    else
-        ToggleBtn.Text = "Trạng thái: TẮT"
-        ToggleBtn.TextColor3 = Color3.fromRGB(255, 85, 85)
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        
-        -- Ngắt kết nối vòng lặp
-        if connection then
-            connection:Disconnect()
-            connection = nil
-        end
-        
-        -- Xóa Part khi tắt để tránh gây lag
-        if freePart then
-            freePart:Destroy()
-            freePart = nil
-        end
-    end
+-- 2. Khung bên cạnh (Dùng để bắt khoảnh khắc / log kết quả thực thi)
+local LogBox = Instance.new("TextBox")
+LogBox.Size = UDim2.new(0, 240, 0, 265)
+LogBox.Position = UDim2.new(0, 265, 0, 40)
+LogBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+LogBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+LogBox.PlaceholderText = "Log/Khoảnh khắc chạy code sẽ hiện ở đây..."
+LogBox.Text = "[System]: Sẵn sàng thực thi...\n"
+LogBox.TextSize = 12
+LogBox.TextXAlignment = Enum.TextXAlignment.Left
+LogBox.TextYAlignment = Enum.TextYAlignment.Top
+LogBox.ClearTextOnFocus = false
+LogBox.MultiLine = true
+LogBox.Editable = false -- Chỉ hiển thị log, không cho người dùng gõ vào đây
+LogBox.Parent = MainFrame
+
+-- Hàm thêm dòng log mới
+local function logMessage(msg)
+	local timestamp = os.date("%H:%M:%S")
+	LogBox.Text = LogBox.Text .. "[" .. timestamp .. "]: " .. msg .. "\n"
+end
+
+-- Xử lý sự kiện khi nhấn nút Execute
+ExecuteBtn.MouseButton1Click:Connect(function()
+	local userCode = CodeBox.Text
+	
+	if userCode == "" then
+		logMessage("Lỗi: Khung code đang trống!")
+		return
+	end
+	
+	logMessage("Đang biên dịch và thực thi code...")
+	
+	-- Dùng loadstring để chạy code người dùng nhập vào
+	local success, err = pcall(function()
+		local func = loadstring(userCode)
+		if func then
+			func()
+		else
+			error("Lỗi cú pháp (Syntax Error)")
+		end
+	end)
+	
+	if success then
+		logMessage("Thực thi thành công!")
+	else
+		logMessage("Lỗi thực thi: " tostring(err))
+	end
 end)
