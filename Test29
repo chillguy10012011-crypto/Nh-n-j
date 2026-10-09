@@ -1,0 +1,256 @@
+-- Tạo GUI thuần túy (Phiên bản phân trang thông minh cho Mobile Executor)
+local CoreGui = game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("DefuscatorGUI") then
+    CoreGui["DefuscatorGUI"]:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DefuscatorGUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 350, 0, 450) -- Kích thước nhỏ gọn tối ưu cho màn hình điện thoại
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = " 📱 Bẫy Deobfuscator (Bản Mobile Phân Trang)"
+Title.Parent = MainFrame
+
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(1, -20, 0, 80)
+InputBox.Position = UDim2.new(0, 10, 0, 45)
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
+InputBox.TextSize = 12
+InputBox.Font = Enum.Font.Code
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.PlaceholderText = "-- Dán code chứa link HttpGet vào đây..."
+InputBox.Text = ""
+InputBox.Parent = MainFrame
+
+local ExecButton = Instance.new("TextButton")
+ExecButton.Size = UDim2.new(1, -20, 0, 30)
+ExecButton.Position = UDim2.new(0, 10, 0, 135)
+ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecButton.TextSize = 13
+ExecButton.Font = Enum.Font.SourceSansBold
+ExecButton.Text = "⚡ BÓC TÁC & PHÂN TRANG"
+ExecButton.Parent = MainFrame
+
+-- Thanh điều hướng trang (Dành cho Mobile)
+local NavFrame = Instance.new("Frame")
+NavFrame.Size = UDim2.new(1, -20, 0, 30)
+NavFrame.Position = UDim2.new(0, 10, 0, 175)
+NavFrame.BackgroundTransparency = 1
+NavFrame.Parent = MainFrame
+
+local PrevBtn = Instance.new("TextButton")
+PrevBtn.Size = UDim2.new(0, 80, 1, 0)
+PrevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PrevBtn.TextSize = 12
+PrevBtn.Font = Enum.Font.SourceSansBold
+PrevBtn.Text = "⬅️ Trang trước"
+PrevBtn.Parent = NavFrame
+
+local PageLabel = Instance.new("TextLabel")
+PageLabel.Size = UDim2.new(1, -165, 1, 0)
+PageLabel.Position = UDim2.new(0, 85, 0, 0)
+PageLabel.BackgroundTransparency = 1
+PageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PageLabel.TextSize = 13
+PageLabel.Font = Enum.Font.SourceSansBold
+PageLabel.Text = "Trang: 0 / 0"
+PageLabel.TextXAlignment = Enum.TextXAlignment.Center
+PageLabel.Parent = NavFrame
+
+local NextBtn = Instance.new("TextButton")
+NextBtn.Size = UDim2.new(0, 80, 1, 0)
+NextBtn.Position = UDim2.new(1, -80, 1, 0)
+NextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NextBtn.TextSize = 12
+NextBtn.Font = Enum.Font.SourceSansBold
+NextBtn.Text = "Trang sau ➡️"
+NextBtn.Parent = NavFrame
+
+-- Khung hiển thị kết quả từng trang
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 185)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 215)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+ScrollingFrame.Parent = MainFrame
+
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(1, 0, 1, 0)
+OutputBox.Position = UDim2.new(0, 0, 0, 0)
+OutputBox.BackgroundTransparency = 1
+OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
+OutputBox.TextSize = 12
+OutputBox.Font = Enum.Font.Code
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Text = "-- Kết quả phân trang sẽ hiện ở đây..."
+OutputBox.Parent = ScrollingFrame
+
+-- Biến quản lý trang
+local pages = {}
+local currentPage = 1
+
+local function updatePageDisplay()
+    if #pages == 0 then
+        PageLabel.Text = "Trang: 0 / 0"
+        OutputBox.Text = "-- Không có dữ liệu."
+        return
+    end
+    if currentPage < 1 then currentPage = 1 end
+    if currentPage > #pages then currentPage = #pages end
+    
+    PageLabel.Text = string.format("Trang: %d / %d", currentPage, #pages)
+    OutputBox.Text = pages[currentPage]
+end
+
+PrevBtn.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        updatePageDisplay()
+    end
+end)
+
+NextBtn.MouseButton1Click:Connect(function()
+    if currentPage < #pages then
+        currentPage = currentPage + 1
+        updatePageDisplay()
+    end
+end)
+
+-- -------------------------------------------------------------------------
+-- LOGIC BẪY & CẮT TRANG AN TOÀN TRÊN MOBILE
+-- -------------------------------------------------------------------------
+ExecButton.MouseButton1Click:Connect(function()
+    local rawCode = InputBox.Text
+    if rawCode == "" then
+        OutputBox.Text = "⚠️ Lỗi: Vui lòng nhập code!"
+        return
+    end
+
+    OutputBox.Text = "⏳ Đang bóc tách và phân trang dữ liệu..."
+    pages = {}
+    currentPage = 1
+
+    local old_loadstring = loadstring
+    local capturedChunks = {}
+    local loadCount = 0
+
+    local function addChunkToPages(text)
+        -- Cắt nhỏ văn bản thành từng khúc 40,000 ký tự để không bao giờ bị tràn giới hạn của Roblox
+        local chunkSize = 40000
+        for i = 1, #text, chunkSize do
+            local part = text:sub(i, i + chunkSize - 1)
+            table.insert(pages, part)
+        end
+    end
+
+    local interceptedHttpGet = function(self, url)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- [HTTPGET #%d]: %s\n", loadCount, tostring(url))
+        
+        local success, fileContent = pcall(function()
+            return game:HttpGet(url)
+        end)
+        
+        if success then
+            addChunkToPages(header .. fileContent)
+            updatePageDisplay()
+            return fileContent
+        else
+            addChunkToPages(header .. "-- [LỖI TẢI LINK]")
+            updatePageDisplay()
+            return ""
+        end
+    end
+
+    local function recursiveTrap(codeChunk, chunkName)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- [LOADSTRING #%d] - Chunk: %s\n", loadCount, tostring(chunkName))
+        addChunkToPages(header .. tostring(codeChunk))
+        updatePageDisplay()
+        
+        local realFunc, loadErr = old_loadstring(codeChunk, chunkName)
+        if realFunc then
+            local envProxy
+            envProxy = setmetatable({
+                loadstring = function(subChunk, subName)
+                    return recursiveTrap(subChunk, subName)
+                end,
+                game = setmetatable({
+                    HttpGet = function(s, u)
+                        return interceptedHttpGet(s, u)
+                    end
+                }, {
+                    __index = game
+                })
+            }, {
+                __index = getgenv(),
+            })
+            
+            setfenv(realFunc, envProxy)
+            pcall(realFunc)
+            return realFunc
+        else
+            return function() end
+        end
+    end
+
+    getgenv().loadstring = function(codeChunk, chunkName)
+        return recursiveTrap(codeChunk, chunkName)
+    end
+
+    local envProxyTop = setmetatable({
+        game = setmetatable({
+            HttpGet = function(s, u)
+                return interceptedHttpGet(s, u)
+            end
+        }, {
+            __index = game
+        })
+    }, {
+        __index = getgenv(),
+    })
+
+    local success, err = pcall(function()
+        local func, loadErr = old_loadstring(rawCode)
+        if func then
+            setfenv(func, envProxyTop)
+            func()
+        else
+            OutputBox.Text = "❌ Lỗi cú pháp ban đầu:\n" .. tostring(loadErr)
+        end
+    end)
+
+    getgenv().loadstring = old_loadstring
+
+    if not success and #pages == 0 then
+        OutputBox.Text = "⚠️ Lỗi thực thi:\n" .. tostring(err)
+    elseif #pages > 0 then
+        updatePageDisplay()
+    end
+end)
