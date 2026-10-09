@@ -1,5 +1,5 @@
 -- =========================================================================
--- BẪY DEOBFUSCATOR ULTIMATE PRO + GITHUB AUTO-SYNC (HOÀN CHỈNH)
+-- BẪY DEOBFUSCATOR ULTIMATE PRO + GITHUB AUTO-SYNC (ĐÃ CẬP NHẬT TOKEN)
 -- =========================================================================
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -271,9 +271,9 @@ CopyBtn.MouseButton1Click:Connect(function()
 end)
 
 -- =========================================================================
--- LOGIC GITHUB API (ĐÃ TÍCH HỢP SẴN TOKEN & REPO CỦA NÍ)
+-- LOGIC GITHUB API (TOKEN MỚI)
 -- =========================================================================
-local GITHUB_TOKEN = "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"
+local GITHUB_TOKEN = "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"
 local GITHUB_REPO = "Chillguy10012011-crypto/Script"
 
 GitBtn.MouseButton1Click:Connect(function()
