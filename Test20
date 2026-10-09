@@ -1,0 +1,124 @@
+-- Tạo GUI chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DecoderGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Khung chính (Main Frame)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
+MainFrame.Size = UDim2.new(0, 500, 0, 350)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Giúp kéo thả GUI trên màn hình
+
+-- Tiêu đề
+local Title = Instance.new("TextLabel")
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.BorderSizePixel = 0
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "Roblox Code Decoder & Executor"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+
+-- Khung nhập code mã hóa (Input TextBox)
+local InputBox = Instance.new("TextBox")
+InputBox.Name = "InputBox"
+InputBox.Parent = MainFrame
+InputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+InputBox.BorderColor3 = Color3.fromRGB(70, 70, 70)
+InputBox.Position = UDim2.new(0.03, 0, 0.15, 0)
+InputBox.Size = UDim2.new(0.94, 0, 0, 60)
+InputBox.Font = Enum.Font.Code
+InputBox.PlaceholderText = "Dán code mã hóa hoặc loadstring vào đây..."
+InputBox.Text = ""
+InputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+InputBox.TextSize = 14
+InputBox.ClearTextOnFocus = false
+InputBox.MultiLine = true
+InputBox.TextWrapped = true
+InputBox.TextXAlignment = Enum.TextXAlignment.Left
+InputBox.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Nút Thực thi (Execute Button)
+local ExecuteBtn = Instance.new("TextButton")
+ExecuteBtn.Name = "ExecuteBtn"
+ExecuteBtn.Parent = MainFrame
+ExecuteBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+ExecuteBtn.BorderSizePixel = 0
+ExecuteBtn.Position = UDim2.new(0.03, 0, 0.35, 0)
+ExecuteBtn.Size = UDim2.new(0.94, 0, 0, 35)
+ExecuteBtn.Font = Enum.Font.SourceSansBold
+ExecuteBtn.Text = "EXECUTE & DECODE"
+ExecuteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecuteBtn.TextSize = 16
+
+-- Khung hiển thị kết quả (Scrolling Frame để cuộn lên xuống)
+local ScrollingOutput = Instance.new("ScrollingFrame")
+ScrollingOutput.Name = "ScrollingOutput"
+ScrollingOutput.Parent = MainFrame
+ScrollingOutput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ScrollingOutput.BorderColor3 = Color3.fromRGB(60, 60, 60)
+ScrollingOutput.Position = UDim2.new(0.03, 0, 0.48, 0)
+ScrollingOutput.Size = UDim2.new(0.94, 0, 0.47, 0)
+ScrollingOutput.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingOutput.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollingOutput.ScrollBarThickness = 8
+
+-- TextLabel bên trong ScrollingFrame để chứa nội dung code đã giải mã
+local OutputText = Instance.new("TextLabel")
+OutputText.Name = "OutputText"
+OutputText.Parent = ScrollingOutput
+OutputText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+OutputText.BackgroundTransparency = 1.00
+OutputText.Size = UDim2.new(1, 0, 1, 0)
+OutputText.Font = Enum.Font.Code
+OutputText.Text = "-- Code đã giải mã sẽ hiển thị ở đây --\n"
+OutputText.TextColor3 = Color3.fromRGB(0, 255, 127)
+OutputText.TextSize = 13
+OutputText.TextXAlignment = Enum.TextXAlignment.Left
+OutputText.TextYAlignment = Enum.TextYAlignment.Top
+OutputText.TextWrapped = true
+
+-- Xử lý logic khi nhấn nút Execute
+ExecuteBtn.MouseButton1Click:Connect(function()
+    local rawInput = InputBox.Text
+    if rawInput == "" then return end
+    
+    -- Xử lý mô phỏng bắt khoảnh khắc giải mã & thực thi
+    local decodedResult = ""
+    
+    -- Kiểm tra nếu người dùng nhập loadstring dạng thông thường
+    local success, err = pcall(function()
+        -- Nếu là loadstring hợp lệ, ta có thể thử load nó hoặc bắt nội dung
+        if string.find(rawInput, "loadstring") then
+            decodedResult = "-- Đã bắt và phân tích chuỗi loadstring:\n" .. rawInput
+        else
+            decodedResult = "-- Nội dung giải mã từ chuỗi:\n" .. rawInput
+        end
+        
+        -- Thực thi đoạn code người dùng nhập vào
+        local func, loadErr = loadstring(rawInput)
+        if func then
+            task.spawn(func) -- Chạy code bất đồng bộ
+            decodedResult = decodedResult .. "\n\n[Trạng thái]: Thực thi (Execute) thành công!"
+        else
+            decodedResult = decodedResult .. "\n\n[Lỗi thực thi]: " .. tostring(loadErr)
+        end
+    end)
+
+    if not success then
+        decodedResult = "-- Lỗi xử lý: " .. tostring(err)
+    end
+
+    -- Thêm khoảng cách (cách dòng) giữa lần in cũ và lần in mới
+    local currentText = OutputText.Text
+    local spacer = "\n\n----------------------------------------\n\n"
+    
+    OutputText.Text = currentText .. spacer .. decodedResult
+end)
