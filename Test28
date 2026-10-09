@@ -1,0 +1,234 @@
+-- Tạo GUI thuần túy (Phiên bản chống quá tải ký tự & Tự động ghi file)
+local CoreGui = game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("DefuscatorGUI") then
+    CoreGui["DefuscatorGUI"]:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DefuscatorGUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 650, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -325, 0.5, -260)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = " 🕵️‍♂️ Siêu Bẫy Deobfuscator (Chống Tràn Ký Tự & Tự Động Lưu File)"
+Title.Parent = MainFrame
+
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(1, -20, 0, 90)
+InputBox.Position = UDim2.new(0, 10, 0, 50)
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
+InputBox.TextSize = 13
+InputBox.Font = Enum.Font.Code
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.PlaceholderText = "-- Dán code chứa link HttpGet hoặc mã hóa vào đây..."
+InputBox.Text = ""
+InputBox.Parent = MainFrame
+
+local ExecButton = Instance.new("TextButton")
+ExecButton.Size = UDim2.new(1, -20, 0, 35)
+ExecButton.Position = UDim2.new(0, 10, 0, 150)
+ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecButton.TextSize = 15
+ExecButton.Font = Enum.Font.SourceSansBold
+ExecButton.Text = "⚡ KÍCH HOẠT SIÊU BẪY & XUẤT FILE"
+ExecButton.Parent = MainFrame
+
+local OutputTitle = Instance.new("TextLabel")
+OutputTitle.Size = UDim2.new(1, -20, 0, 20)
+OutputTitle.Position = UDim2.new(0, 10, 0, 190)
+OutputTitle.BackgroundTransparency = 1
+OutputTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+OutputTitle.TextSize = 14
+OutputTitle.Font = Enum.Font.SourceSansBold
+OutputTitle.Text = "📜 Trạng thái & Tóm tắt (File đầy đủ sẽ được lưu vào thư mục workspace):"
+OutputTitle.TextXAlignment = Enum.TextXAlignment.Left
+OutputTitle.Parent = MainFrame
+
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 275)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 215)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollingFrame.Parent = MainFrame
+
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(1, 0, 0, 0)
+OutputBox.Position = UDim2.new(0, 0, 0, 0)
+OutputBox.BackgroundTransparency = 1
+OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
+OutputBox.TextSize = 13
+OutputBox.Font = Enum.Font.Code
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Text = "-- Kết quả tóm tắt sẽ hiển thị ở đây..."
+OutputBox.Parent = ScrollingFrame
+
+OutputBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local lines = 1
+    for _ in OutputBox.Text:gmatch("\n") do
+        lines = lines + 1
+    end
+    OutputBox.Size = UDim2.new(1, 0, 0, math.max(275, lines * 16 + 20))
+end)
+
+-- -------------------------------------------------------------------------
+-- LOGIC SIÊU BẪY AN TOÀN (BẢO VỆ CHỐNG TRÀN BỘ NHỚ)
+-- -------------------------------------------------------------------------
+ExecButton.MouseButton1Click:Connect(function()
+    local rawCode = InputBox.Text
+    if rawCode == "" then
+        OutputBox.Text = "⚠️ Lỗi: Vui lòng nhập code vào khung bên trên!"
+        return
+    end
+
+    OutputBox.Text = "⏳ Đang quét mạng và bóc tách dữ liệu..."
+
+    local old_loadstring = loadstring
+    local capturedChunks = {}
+    local loadCount = 0
+
+    local interceptedHttpGet = function(self, url)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- ========================================\n-- [PHÁT HIỆN LINK HTTPGET THỨ %d]\n-- Link: %s\n-- ========================================\n", loadCount, tostring(url))
+        
+        local success, fileContent = pcall(function()
+            return game:HttpGet(url)
+        end)
+        
+        if success then
+            local length = #fileContent
+            local displayContent = fileContent
+            
+            -- Nếu file quá dài (> 100k ký tự), ta cắt bớt khi hiển thị lên màn hình GUI để tránh lỗi văng game
+            if length > 100000 then
+                displayContent = fileContent:sub(1, 100000) .. "\n\n-- [⚠️ CẢNH BÁO]: Nội dung quá lớn (" .. length .. " ký tự). Đã cắt bớt hiển thị trên màn hình, nhưng toàn bộ file gốc đã được lưu nguyên vẹn vào thư mục workspace!"
+            end
+
+            local fullContent = header .. displayContent
+            table.insert(capturedChunks, fullContent)
+            
+            -- Cập nhật giao diện an toàn dưới 180,000 ký tự
+            local combinedText = table.concat(capturedChunks, "\n")
+            if #combinedText > 180000 then
+                OutputBox.Text = combinedText:sub(1, 180000) .. "\n\n-- [⚠️ THÔNG BÁO]: Giao diện đã đạt giới hạn hiển thị ký tự của Roblox!"
+            else
+                OutputBox.Text = combinedText
+            end
+
+            -- ⭐ TỰ ĐỘNG LƯU FILE GỐC VÀO MÁY (Workspace của Executor)
+            if writefile then
+                local safeFileName = "Deobfuscated_Script_" .. loadCount .. ".txt"
+                pcall(function()
+                    writefile(safeFileName, fileContent)
+                end)
+            end
+
+            return fileContent
+        else
+            local errContent = header .. "-- [LỖI] Không thể tải nội dung từ link này: " .. tostring(fileContent)
+            table.insert(capturedChunks, errContent)
+            OutputBox.Text = table.concat(capturedChunks, "\n")
+            return ""
+        end
+    end
+
+    local function recursiveTrap(codeChunk, chunkName)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- ========================================\n-- [LOADSTRING TẦNG THỨ %d] - Chunk: %s\n-- ========================================\n", loadCount, tostring(chunkName))
+        local displayChunk = tostring(codeChunk)
+        if #displayChunk > 100000 then
+            displayChunk = displayChunk:sub(1, 100000) .. "\n\n-- [⚠️ CẢNH BÁO]: Chunk quá lớn đã được cắt ngắn hiển thị."
+        end
+        
+        local fullChunkContent = header .. displayChunk
+        table.insert(capturedChunks, fullChunkContent)
+        
+        local combinedText = table.concat(capturedChunks, "\n")
+        if #combinedText > 180000 then
+            OutputBox.Text = combinedText:sub(1, 180000) .. "\n\n-- [⚠️ THÔNG BÁO]: Giao diện đạt giới hạn hiển thị."
+        else
+            OutputBox.Text = combinedText
+        end
+        
+        local realFunc, loadErr = old_loadstring(codeChunk, chunkName)
+        if realFunc then
+            local envProxy
+            envProxy = setmetatable({
+                loadstring = function(subChunk, subName)
+                    return recursiveTrap(subChunk, subName)
+                end,
+                game = setmetatable({
+                    HttpGet = function(s, u)
+                        return interceptedHttpGet(s, u)
+                    end
+                }, {
+                    __index = game
+                })
+            }, {
+                __index = getgenv(),
+            })
+            
+            setfenv(realFunc, envProxy)
+            pcall(realFunc)
+            return realFunc
+        else
+            return function() end
+        end
+    end
+
+    getgenv().loadstring = function(codeChunk, chunkName)
+        return recursiveTrap(codeChunk, chunkName)
+    end
+
+    local envProxyTop = setmetatable({
+        game = setmetatable({
+            HttpGet = function(s, u)
+                return interceptedHttpGet(s, u)
+            end
+        }, {
+            __index = game
+        })
+    }, {
+        __index = getgenv(),
+    })
+
+    local success, err = pcall(function()
+        local func, loadErr = old_loadstring(rawCode)
+        if func then
+            setfenv(func, envProxyTop)
+            func()
+        else
+            OutputBox.Text = "❌ Lỗi cú pháp khi nạp code ban đầu:\n" .. tostring(loadErr)
+        end
+    end)
+
+    getgenv().loadstring = old_loadstring
+
+    if not success and #capturedChunks == 0 then
+        OutputBox.Text = "⚠️ Thực thi kết thúc với lỗi:\n" .. tostring(err)
+    elseif #capturedChunks > 0 then
+        OutputBox.Text = table.concat(capturedChunks, "\n") .. "\n\n-- [HOÀN TẤT] Đã xử lý xong! Kiểm tra thư mục workspace của executor để lấy toàn bộ các file code gốc không bị cắt ngắn."
+    end
+end)
