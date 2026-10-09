@@ -1,0 +1,178 @@
+-- Tạo GUI thuần túy (Phiên bản bẫy đa tầng đệ quy - Multi-Layer Recursive Trap)
+local CoreGui = game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("DefuscatorGUI") then
+    CoreGui["DefuscatorGUI"]:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DefuscatorGUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 600, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = " 🕵️‍♂️ Bóc Tách Code Đa Tầng (Recursive Multi-Layer Deobfuscator)"
+Title.Parent = MainFrame
+
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(1, -20, 0, 100)
+InputBox.Position = UDim2.new(0, 10, 0, 50)
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
+InputBox.TextSize = 13
+InputBox.Font = Enum.Font.Code
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.PlaceholderText = "-- Dán code đa tầng của hacker vào đây..."
+InputBox.Text = ""
+InputBox.Parent = MainFrame
+
+local ExecButton = Instance.new("TextButton")
+ExecButton.Size = UDim2.new(1, -20, 0, 35)
+ExecButton.Position = UDim2.new(0, 10, 0, 160)
+ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecButton.TextSize = 15
+ExecButton.Font = Enum.Font.SourceSansBold
+ExecButton.Text = "⚡ BÓC TÁC TẤT CẢ CÁC TẦNG MÃ HÓA"
+ExecButton.Parent = MainFrame
+
+local OutputTitle = Instance.new("TextLabel")
+OutputTitle.Size = UDim2.new(1, -20, 0, 20)
+OutputTitle.Position = UDim2.new(0, 10, 0, 200)
+OutputTitle.BackgroundTransparency = 1
+OutputTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+OutputTitle.TextSize = 14
+OutputTitle.Font = Enum.Font.SourceSansBold
+OutputTitle.Text = "📜 Các tầng code đã giải mã (Từ ngoài vào trong):"
+OutputTitle.TextXAlignment = Enum.TextXAlignment.Left
+OutputTitle.Parent = MainFrame
+
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 250)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 225)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollingFrame.Parent = MainFrame
+
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(1, 0, 0, 0)
+OutputBox.Position = UDim2.new(0, 0, 0, 0)
+OutputBox.BackgroundTransparency = 1
+OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
+OutputBox.TextSize = 13
+OutputBox.Font = Enum.Font.Code
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Text = "-- Kết quả bóc tách đa tầng sẽ hiển thị ở đây..."
+OutputBox.Parent = ScrollingFrame
+
+OutputBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local lines = 1
+    for _ in OutputBox.Text:gmatch("\n") do
+        lines = lines + 1
+    end
+    OutputBox.Size = UDim2.new(1, 0, 0, math.max(250, lines * 16 + 20))
+end)
+
+-- -------------------------------------------------------------------------
+-- LOGIC BẪY ĐỆ QUY ĐA TẦNG
+-- -------------------------------------------------------------------------
+ExecButton.MouseButton1Click:Connect(function()
+    local rawCode = InputBox.Text
+    if rawCode == "" then
+        OutputBox.Text = "⚠️ Lỗi: Vui lòng nhập code vào khung bên trên!"
+        return
+    end
+
+    OutputBox.Text = "⏳ Đang bóc tách các lớp bảo vệ đa tầng..."
+
+    local old_loadstring = loadstring
+    local capturedChunks = {}
+    local loadCount = 0
+
+    -- Khai báo hàm bẫy có khả năng đệ quy
+    local function recursiveTrap(codeChunk, chunkName)
+        loadCount = loadCount + 1
+        local currentLayer = loadCount
+        
+        local header = string.format("\n\n-- ========================================\n-- [TẦNG GIẢI MÃ THỨ %d] - Chunk: %s\n-- ========================================\n", currentLayer, tostring(chunkName))
+        local fullChunkContent = header .. tostring(codeChunk)
+        
+        table.insert(capturedChunks, fullChunkContent)
+        OutputBox.Text = table.concat(capturedChunks, "\n")
+        
+        -- ⭐ ĐIỂM KHÁC BIỆT QUAN TRỌNG: 
+        -- Thay vì chặn đứng, ta vẫn cho phép đoạn code này được biên dịch và chạy tiếp 
+        -- để nó tự động lòi ra các tầng tiếp theo (nếu có).
+        local realFunc, loadErr = old_loadstring(codeChunk, chunkName)
+        if realFunc then
+            -- Tạm thời ghi đè loadstring bên trong môi trường con để bắt tiếp các tầng sâu hơn
+            local envProxy
+            envProxy = setmetatable({
+                loadstring = function(subChunk, subName)
+                    return recursiveTrap(subChunk, subName)
+                end
+            }, {
+                __index = getgenv(),
+            })
+            
+            setfenv(realFunc, envProxy)
+            
+            -- Chạy ngầm hàm của tầng này để nó tiếp tục gọi loadstring tầng kế tiếp
+            pcall(realFunc)
+            
+            return realFunc
+        else
+            return function()
+                print("[Deobfuscator] Không thể biên dịch chunk ở tầng " .. currentLayer .. ": " .. tostring(loadErr))
+            end
+        end
+    end
+
+    -- Gắn bẫy toàn cục cấp cao nhất
+    getgenv().loadstring = function(codeChunk, chunkName)
+        return recursiveTrap(codeChunk, chunkName)
+    end
+
+    local envProxyTop = setmetatable({}, {
+        __index = getgenv(),
+    })
+
+    local success, err = pcall(function()
+        local func, loadErr = old_loadstring(rawCode)
+        if func then
+            setfenv(func, envProxyTop)
+            func()
+        else
+            OutputBox.Text = "❌ Lỗi cú pháp khi nạp code ban đầu:\n" .. tostring(loadErr)
+        end
+    end)
+
+    -- Khôi phục lại hàm loadstring gốc
+    getgenv().loadstring = old_loadstring
+
+    if not success and #capturedChunks == 0 then
+        OutputBox.Text = "⚠️ Thực thi kết thúc với lỗi:\n" .. tostring(err)
+    elseif #capturedChunks > 0 then
+        OutputBox.Text = table.concat(capturedChunks, "\n") .. "\n\n-- [HOÀN TẤT] Đã bóc sạch " .. loadCount .. " tầng mã hóa!"
+    end
+end)
