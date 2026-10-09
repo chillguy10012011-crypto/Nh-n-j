@@ -1,4 +1,4 @@
--- Tạo GUI thuần túy (Phiên bản phân trang thông minh cho Mobile Executor)
+-- Tạo GUI thuần túy (Phiên bản Auto-Copy thẳng vào Clipboard cho Mobile)
 local CoreGui = game:GetService("CoreGui")
 
 if CoreGui:FindFirstChild("DefuscatorGUI") then
@@ -11,8 +11,8 @@ ScreenGui.Parent = CoreGui
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 450) -- Kích thước nhỏ gọn tối ưu cho màn hình điện thoại
-MainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+MainFrame.Size = UDim2.new(0, 360, 0, 440)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -220)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -25,7 +25,7 @@ Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = " 📱 Bẫy Deobfuscator (Bản Mobile Phân Trang)"
+Title.Text = " 📱 Bẫy Deobfuscator (Bản Auto-Clipboard Siêu Tốc)"
 Title.Parent = MainFrame
 
 local InputBox = Instance.new("TextBox")
@@ -42,63 +42,38 @@ InputBox.Text = ""
 InputBox.Parent = MainFrame
 
 local ExecButton = Instance.new("TextButton")
-ExecButton.Size = UDim2.new(1, -20, 0, 30)
+ExecButton.Size = UDim2.new(1, -20, 0, 35)
 ExecButton.Position = UDim2.new(0, 10, 0, 135)
 ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
 ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ExecButton.TextSize = 13
 ExecButton.Font = Enum.Font.SourceSansBold
-ExecButton.Text = "⚡ BÓC TÁC & PHÂN TRANG"
+ExecButton.Text = "⚡ BÓ & TỰ ĐỘNG COPY VÀO CLIPBOARD"
 ExecButton.Parent = MainFrame
 
--- Thanh điều hướng trang (Dành cho Mobile)
-local NavFrame = Instance.new("Frame")
-NavFrame.Size = UDim2.new(1, -20, 0, 30)
-NavFrame.Position = UDim2.new(0, 10, 0, 175)
-NavFrame.BackgroundTransparency = 1
-NavFrame.Parent = MainFrame
+-- Nút phụ hỗ trợ copy thủ công nếu lỡ bấm hụt
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(1, -20, 0, 30)
+CopyBtn.Position = UDim2.new(0, 10, 0, 175)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.TextSize = 12
+CopyBtn.Font = Enum.Font.SourceSansBold
+CopyBtn.Text = "📋 COPY LẠI KẾT QUẢ VÀO CLIPBOARD"
+CopyBtn.Parent = MainFrame
 
-local PrevBtn = Instance.new("TextButton")
-PrevBtn.Size = UDim2.new(0, 80, 1, 0)
-PrevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PrevBtn.TextSize = 12
-PrevBtn.Font = Enum.Font.SourceSansBold
-PrevBtn.Text = "⬅️ Trang trước"
-PrevBtn.Parent = NavFrame
-
-local PageLabel = Instance.new("TextLabel")
-PageLabel.Size = UDim2.new(1, -165, 1, 0)
-PageLabel.Position = UDim2.new(0, 85, 0, 0)
-PageLabel.BackgroundTransparency = 1
-PageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-PageLabel.TextSize = 13
-PageLabel.Font = Enum.Font.SourceSansBold
-PageLabel.Text = "Trang: 0 / 0"
-PageLabel.TextXAlignment = Enum.TextXAlignment.Center
-PageLabel.Parent = NavFrame
-
-local NextBtn = Instance.new("TextButton")
-NextBtn.Size = UDim2.new(0, 80, 1, 0)
-NextBtn.Position = UDim2.new(1, -80, 1, 0)
-NextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-NextBtn.TextSize = 12
-NextBtn.Font = Enum.Font.SourceSansBold
-NextBtn.Text = "Trang sau ➡️"
-NextBtn.Parent = NavFrame
-
--- Khung hiển thị kết quả từng trang
+-- Khung hiển thị trạng thái tóm tắt
 local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Size = UDim2.new(1, -20, 0, 185)
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 200)
 ScrollingFrame.Position = UDim2.new(0, 10, 0, 215)
 ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 ScrollingFrame.BorderSizePixel = 0
-ScrollingFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 ScrollingFrame.Parent = MainFrame
 
 local OutputBox = Instance.new("TextBox")
-OutputBox.Size = UDim2.new(1, 0, 1, 0)
+OutputBox.Size = UDim2.new(1, 0, 0, 0)
 OutputBox.Position = UDim2.new(0, 0, 0, 0)
 OutputBox.BackgroundTransparency = 1
 OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
@@ -108,42 +83,35 @@ OutputBox.MultiLine = true
 OutputBox.ClearTextOnFocus = false
 OutputBox.TextXAlignment = Enum.TextXAlignment.Left
 OutputBox.TextYAlignment = Enum.TextYAlignment.Top
-OutputBox.Text = "-- Kết quả phân trang sẽ hiện ở đây..."
+OutputBox.Text = "-- Trạng thái và tóm tắt sẽ hiện ở đây...\n-- Sau khi chạy xong, toàn bộ code sẽ tự động nằm trong bộ nhớ tạm của điện thoại!"
 OutputBox.Parent = ScrollingFrame
 
--- Biến quản lý trang
-local pages = {}
-local currentPage = 1
-
-local function updatePageDisplay()
-    if #pages == 0 then
-        PageLabel.Text = "Trang: 0 / 0"
-        OutputBox.Text = "-- Không có dữ liệu."
-        return
+OutputBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local lines = 1
+    for _ in OutputBox.Text:gmatch("\n") do
+        lines = lines + 1
     end
-    if currentPage < 1 then currentPage = 1 end
-    if currentPage > #pages then currentPage = #pages end
-    
-    PageLabel.Text = string.format("Trang: %d / %d", currentPage, #pages)
-    OutputBox.Text = pages[currentPage]
-end
-
-PrevBtn.MouseButton1Click:Connect(function()
-    if currentPage > 1 then
-        currentPage = currentPage - 1
-        updatePageDisplay()
-    end
+    OutputBox.Size = UDim2.new(1, 0, 0, math.max(200, lines * 15 + 20))
 end)
 
-NextBtn.MouseButton1Click:Connect(function()
-    if currentPage < #pages then
-        currentPage = currentPage + 1
-        updatePageDisplay()
+-- Biến toàn cục lưu trữ toàn bộ chuỗi code gom được
+local fullMasterCode = ""
+
+CopyBtn.MouseButton1Click:Connect(function()
+    if fullMasterCode ~= "" then
+        if setclipboard then
+            setclipboard(fullMasterCode)
+            OutputBox.Text = "✅ Đã copy lại toàn bộ code vào Clipboard thành công!\n-- Bạn có thể qua ứng dụng ghi chú để Paste ra."
+        else
+            OutputBox.Text = "⚠️ Executor của bạn không hỗ trợ hàm setclipboard()!"
+        end
+    else
+        OutputBox.Text = "⚠️ Chưa có dữ liệu để copy!"
     end
 end)
 
 -- -------------------------------------------------------------------------
--- LOGIC BẪY & CẮT TRANG AN TOÀN TRÊN MOBILE
+-- LOGIC BẪY & GOM TOÀN BỘ VÀO 1 BIẾN DUY NHẤT
 -- -------------------------------------------------------------------------
 ExecButton.MouseButton1Click:Connect(function()
     local rawCode = InputBox.Text
@@ -152,47 +120,34 @@ ExecButton.MouseButton1Click:Connect(function()
         return
     end
 
-    OutputBox.Text = "⏳ Đang bóc tách và phân trang dữ liệu..."
-    pages = {}
-    currentPage = 1
+    OutputBox.Text = "⏳ Đang quét và gom toàn bộ mã nguồn..."
+    fullMasterCode = ""
 
     local old_loadstring = loadstring
-    local capturedChunks = {}
+    local collectedChunks = {}
     local loadCount = 0
-
-    local function addChunkToPages(text)
-        -- Cắt nhỏ văn bản thành từng khúc 40,000 ký tự để không bao giờ bị tràn giới hạn của Roblox
-        local chunkSize = 40000
-        for i = 1, #text, chunkSize do
-            local part = text:sub(i, i + chunkSize - 1)
-            table.insert(pages, part)
-        end
-    end
 
     local interceptedHttpGet = function(self, url)
         loadCount = loadCount + 1
-        local header = string.format("\n\n-- [HTTPGET #%d]: %s\n", loadCount, tostring(url))
+        local header = string.format("\n\n-- ========================================\n-- [HTTPGET #%d]: %s\n-- ========================================\n", loadCount, tostring(url))
         
         local success, fileContent = pcall(function()
             return game:HttpGet(url)
         end)
         
         if success then
-            addChunkToPages(header .. fileContent)
-            updatePageDisplay()
+            table.insert(collectedChunks, header .. fileContent)
             return fileContent
         else
-            addChunkToPages(header .. "-- [LỖI TẢI LINK]")
-            updatePageDisplay()
+            table.insert(collectedChunks, header .. "-- [LỖI TẢI LINK]")
             return ""
         end
     end
 
     local function recursiveTrap(codeChunk, chunkName)
         loadCount = loadCount + 1
-        local header = string.format("\n\n-- [LOADSTRING #%d] - Chunk: %s\n", loadCount, tostring(chunkName))
-        addChunkToPages(header .. tostring(codeChunk))
-        updatePageDisplay()
+        local header = string.format("\n\n-- ========================================\n-- [LOADSTRING #%d] - Chunk: %s\n-- ========================================\n", loadCount, tostring(chunkName))
+        table.insert(collectedChunks, header .. tostring(codeChunk))
         
         local realFunc, loadErr = old_loadstring(codeChunk, chunkName)
         if realFunc then
@@ -248,9 +203,22 @@ ExecButton.MouseButton1Click:Connect(function()
 
     getgenv().loadstring = old_loadstring
 
-    if not success and #pages == 0 then
-        OutputBox.Text = "⚠️ Lỗi thực thi:\n" .. tostring(err)
-    elseif #pages > 0 then
-        updatePageDisplay()
+    -- Gom tất cả các khối lại thành một chuỗi siêu to khổng lồ duy nhất
+    if #collectedChunks > 0 then
+        fullMasterCode = table.concat(collectedChunks, "\n")
+        
+        -- Tự động đẩy thẳng vào Clipboard của điện thoại
+        if setclipboard then
+            setclipboard(fullMasterCode)
+            OutputBox.Text = string.format("🎉 THÀNH CÔNG RỰC RỠ!\n\n- Đã bắt trọn %d tầng/link.\n- Tổng độ dài: %d ký tự.\n- 📋 ĐÃ TỰ ĐỘNG COPY TOÀN BỘ VÀO CLIPBOARD!\n\n👉 Bây giờ ní chỉ cần mở ứng dụng Ghi Chú (Notes) trên điện thoại và bấm Dán (Paste) là ra full toàn bộ code gốc!", loadCount, #fullMasterCode)
+        else
+            OutputBox.Text = "⚠️ Đã gom xong nhưng executor không hỗ trợ setclipboard(). Ní hãy bấm nút 'COPY LẠI' màu xanh dương bên trên nhé!"
+        end
+    else
+        if success then
+            OutputBox.Text = "⚠️ Chạy xong nhưng không bắt được lệnh loadstring hay HttpGet nào."
+        else
+            OutputBox.Text = "⚠️ Lỗi thực thi:\n" .. tostring(err)
+        end
     end
 end)
