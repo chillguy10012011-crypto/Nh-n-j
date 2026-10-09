@@ -1,8 +1,9 @@
--- Tạo GUI thuần túy (Phiên bản Ultimate Pro: Thêm Copy & Clear)
+-- =========================================================================
+-- BẪY DEOBFUSCATOR ULTIMATE PRO (FULL CODE HOÀN CHỈNH CHO MOBILE)
+-- =========================================================================
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local Clipboard = setclipboard or toclipboard or function(txt)
-    -- Fallback nếu executor không hỗ trợ setclipboard trực tiếp
     print("[Clipboard Fallback]: " .. txt)
 end
 
@@ -30,7 +31,7 @@ Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = " 📱 Bẫy Deobfuscator Ultimate (Copy & Clear)"
+Title.Text = " 📱 Bẫy Deobfuscator Ultimate Pro"
 Title.Parent = MainFrame
 
 -- Khung chứa Ô nhập code & Nút Clear
@@ -53,7 +54,6 @@ InputBox.PlaceholderText = "-- Dán code chứa link HttpGet vào đây..."
 InputBox.Text = ""
 InputBox.Parent = InputContainer
 
--- Nút Clear (Xóa nhanh ô nhập code)
 local ClearBtn = Instance.new("TextButton")
 ClearBtn.Size = UDim2.new(0, 45, 1, 0)
 ClearBtn.Position = UDim2.new(1, -45, 0, 0)
@@ -101,7 +101,7 @@ ExecButton.Font = Enum.Font.SourceSansBold
 ExecButton.Text = "⚡ BÓC TÁC"
 ExecButton.Parent = ToolBar
 
--- Thanh điều hướng trang (Chỉ hiện ở Mode 2) & Nút Copy
+-- Thanh điều hướng trang & Nút Copy
 local NavFrame = Instance.new("Frame")
 NavFrame.Size = UDim2.new(1, -20, 0, 30)
 NavFrame.Position = UDim2.new(0, 10, 0, 160)
@@ -128,7 +128,6 @@ PageLabel.Text = "Trang: 0 / 0"
 PageLabel.TextXAlignment = Enum.TextXAlignment.Center
 PageLabel.Parent = NavFrame
 
--- Nút Copy trang hiện tại
 local CopyBtn = Instance.new("TextButton")
 CopyBtn.Size = UDim2.new(0, 65, 1, 0)
 CopyBtn.Position = UDim2.new(1, -145, 0, 0)
@@ -173,9 +172,7 @@ OutputBox.TextYAlignment = Enum.TextYAlignment.Top
 OutputBox.Text = "-- Kết quả sẽ hiện ở đây..."
 OutputBox.Parent = ScrollingFrame
 
--- =========================================================================
--- MENU CÀI ĐẶT NỔI (POPUP CHỈNH SỐ DÒNG)
--- =========================================================================
+-- Menu Cài đặt giới hạn số dòng nổi (Popup)
 local SettingsPopup = Instance.new("Frame")
 SettingsPopup.Size = UDim2.new(0, 240, 0, 140)
 SettingsPopup.Position = UDim2.new(0.5, -120, 0.5, -70)
@@ -244,12 +241,10 @@ SaveSettingsBtn.MouseButton1Click:Connect(function()
     SettingsPopup.Visible = false
 end)
 
--- Xóa nhanh ô nhập code khi bấm Clear
 ClearBtn.MouseButton1Click:Connect(function()
     InputBox.Text = ""
 end)
 
--- Copy nội dung trang hiện tại
 CopyBtn.MouseButton1Click:Connect(function()
     local textToCopy = OutputBox.Text
     if textToCopy and textToCopy ~= "-- Kết quả sẽ hiện ở đây..." then
@@ -262,10 +257,12 @@ CopyBtn.MouseButton1Click:Connect(function()
 end)
 
 -- =========================================================================
--- LOGIC QUẢN LÝ MODE & HIỂN THỊ TRANG
+-- LOGIC XỬ LÝ MODE & HIỂN THỊ (BẢO VỆ KHÔNG CẮT ĐÔI DÒNG CODE)
 -- =========================================================================
 local currentMode = 2
 local rawCapturedLogs = {}
+local pages = {}
+local currentPage = 1
 
 ModeBtn.MouseButton1Click:Connect(function()
     if currentMode == 2 then
@@ -283,9 +280,6 @@ ModeBtn.MouseButton1Click:Connect(function()
     end
     updateDisplay()
 end)
-
-local pages = {}
-local currentPage = 1
 
 function updateDisplay()
     if #rawCapturedLogs == 0 then
@@ -350,9 +344,9 @@ NextBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- -------------------------------------------------------------------------
--- LOGIC BẪY BÓC TÁC CODE
--- -------------------------------------------------------------------------
+-- =========================================================================
+-- LOGIC BẪY BÓC TÁC ĐA TẦNG & HTTPGET
+-- =========================================================================
 ExecButton.MouseButton1Click:Connect(function()
     local rawCode = InputBox.Text
     if rawCode == "" then
@@ -441,7 +435,7 @@ ExecButton.MouseButton1Click:Connect(function()
             setfenv(func, envProxyTop)
             func()
         else
-            OutputBox.Text = "❌ Lỗi cú pháp ban đầu:\n" .. tostring(loadErr)
+            OutputBox.Text = "❌ Lỗi cú pháp ban đầu:\n" + tostring(loadErr)
         end
     end)
 
