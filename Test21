@@ -1,0 +1,151 @@
+-- Tạo GUI giải mã và bắt "khoảnh khắc vàng"
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Xóa GUI cũ nếu có để tránh trùng lặp
+if playerGui:FindFirstChild("CodeDecoderGUI") then
+    playerGui.CodeDecoderGUI:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CodeDecoderGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 500, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true -- Cho phép kéo thả bảng GUI
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = mainFrame
+
+-- Tiêu đề
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 35)
+titleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+titleLabel.Text = "  Bẫy Code Mã Hóa (Deobfuscator Trap)"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.Code
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = mainFrame
+
+-- Khung nhập code mã hóa (Input Box)
+local inputLabel = Instance.new("TextLabel")
+inputLabel.Size = UDim2.new(1, -20, 0, 20)
+inputLabel.Position = UDim2.new(0, 10, 0, 45)
+inputLabel.Text = "Nhập chuỗi / script mã hóa vào đây:"
+inputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+inputLabel.TextSize, inputLabel.Font = 12, Enum.Font.SourceSans
+inputLabel.TextXAlignment = Enum.TextXAlignment.Left
+inputLabel.Parent = mainFrame
+
+local inputBox = Instance.new("TextBox")
+inputBox.Size = UDim2.new(1, -20, 0, 120)
+inputBox.Position = UDim2.new(0, 10, 0, 65)
+inputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+inputBox.TextColor3 = Color3.fromRGB(0, 255, 128)
+inputBox.PlaceholderText = "Ví dụ: loadstring(game:HttpGet(...)) hoặc mã đã mã hóa..."
+inputBox.TextSize = 12
+inputBox.Font = Enum.Font.Code
+inputBox.ClearTextOnFocus = false
+inputBox.MultiLine = true
+inputBox.TextWrapped = true
+inputBox.TextXAlignment = Enum.TextXAlignment.Left
+inputBox.TextYAlignment = Enum.TextYAlignment.Top
+inputBox.Parent = mainFrame
+
+-- Nút Thực thi & Bắt code
+local executeBtn = Instance.new("TextButton")
+executeBtn.Size = UDim2.new(1, -20, 0, 30)
+executeBtn.Position = UDim2.new(0, 10, 0, 195)
+executeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+executeBtn.Text = "Bắt Code & Giải Mã"
+executeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+executeBtn.TextSize = 14
+executeBtn.Font = Enum.Font.SourceSansBold
+executeBtn.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = executeBtn
+
+-- Khung Output kết quả (Khoảnh khắc vàng)
+local outputLabel = Instance.new("TextLabel")
+outputLabel.Size = UDim2.new(1, -20, 0, 20)
+outputLabel.Position = UDim2.new(0, 10, 0, 235)
+outputLabel.Text = "Khoảnh khắc vàng (Code sau khi giải mã):"
+outputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+outputLabel.TextSize, outputLabel.Font = 12, Enum.Font.SourceSans
+outputLabel.TextXAlignment = Enum.TextXAlignment.Left
+outputLabel.Parent = mainFrame
+
+local outputBox = Instance.new("TextBox")
+outputBox.Size = UDim2.new(1, -20, 0, 120)
+outputBox.Position = UDim2.new(0, 10, 0, 255)
+outputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+outputBox.TextColor3 = Color3.fromRGB(255, 220, 0)
+outputBox.Text = "-- Kết quả code thô sẽ hiển thị ở đây sau khi bấm nút..."
+outputBox.TextSize = 12
+outputBox.Font = Enum.Font.Code
+outputBox.ClearTextOnFocus = false
+outputBox.MultiLine = true
+outputBox.TextWrapped = true
+outputBox.Editable = false -- Chỉ để đọc
+outputBox.TextXAlignment = Enum.TextXAlignment.Left
+outputBox.TextYAlignment = Enum.TextYAlignment.Top
+outputBox.Parent = mainFrame
+
+-- Xử lý logic bẫy loadstring và hiển thị
+executeBtn.MouseButton1Click:Connect(function()
+    local rawCode = inputBox.Text
+    if rawCode == "" then
+        outputBox.Text = "Lỗi: Bạn chưa nhập code vào ô phía trên!"
+        return
+    end
+
+    outputBox.Text = "Đang xử lý và bẫy code..."
+
+    -- Lưu lại loadstring gốc
+    local oldLoadString = loadstring
+    local capturedCode = "Không bắt được nội dung."
+
+    -- Tạo môi trường bẫy tạm thời
+    local success, err = pcall(function()
+        -- Ghi đè loadstring trong phạm vi thực thi đoạn code này
+        local env = setmetatable({
+            loadstring = function(code, chunkname)
+                capturedCode = code -- Chộp ngay khoảnh khắc code thô lộ dạng
+                outputBox.Text = tostring(code) -- In thẳng ra khung output
+                -- Trả về một hàm trống để ngăn script độc hại chạy thật (giữ an toàn tuyệt đối)
+                return function() 
+                    print("[!] Đã chặn không cho script độc hại thực thi hành vi nguy hiểm.") 
+                end
+            end
+        }, {__index = getgenv()})
+
+        -- Nạp và chạy đoạn code của hacker trong môi trường bẫy
+        local fn, loadErr = oldLoadString(rawCode)
+        if fn then
+            setfenv(fn, env)
+            fn()
+        else
+            outputBox.Text = "Lỗi khi biên soạn đoạn code đầu vào:\n" .. tostring(loadErr)
+        end
+    end)
+
+    if not success then
+        -- Phòng hờ nếu script tự gọi qua các đường khác
+        if capturedCode == "Không bắt được nội dung." then
+            outputBox.Text = "Đã xảy ra lỗi hoặc script không dùng loadstring chuẩn:\n" .. tostring(err)
+        end
+    end
+end)
