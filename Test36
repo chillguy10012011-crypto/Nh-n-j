@@ -1,5 +1,14 @@
--- Tạo GUI thuần túy (Phiên bản Mobile Pro: Đổi Mode & Cài đặt giới hạn số dòng)
+-- =========================================================================
+-- BẪY DEOBFUSCATOR ULTIMATE PRO + GITHUB AUTO-SYNC (HOÀN CHỈNH)
+-- =========================================================================
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local httpRequest = syn and syn.request or http and http.request or http_request or request
+
+local Clipboard = setclipboard or toclipboard or function(txt)
+    print("[Clipboard Fallback]: " .. txt)
+end
 
 if CoreGui:FindFirstChild("DefuscatorGUI") then
     CoreGui["DefuscatorGUI"]:Destroy()
@@ -11,8 +20,8 @@ ScreenGui.Parent = CoreGui
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 360, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -180, 0.5, -240)
+MainFrame.Size = UDim2.new(0, 360, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -260)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -25,12 +34,19 @@ Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = " 📱 Bẫy Deobfuscator Pro (Mode & Cài Đặt)"
+Title.Text = " 📱 Bẫy Deobfuscator + GitHub Auto"
 Title.Parent = MainFrame
 
+-- Khung chứa Ô nhập code & Nút Clear
+local InputContainer = Instance.new("Frame")
+InputContainer.Size = UDim2.new(1, -20, 0, 75)
+InputContainer.Position = UDim2.new(0, 10, 0, 40)
+InputContainer.BackgroundTransparency = 1
+InputContainer.Parent = MainFrame
+
 local InputBox = Instance.new("TextBox")
-InputBox.Size = UDim2.new(1, -20, 0, 70)
-InputBox.Position = UDim2.new(0, 10, 0, 40)
+InputBox.Size = UDim2.new(1, -55, 1, 0)
+InputBox.Position = UDim2.new(0, 0, 0, 0)
 InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
 InputBox.TextSize = 12
@@ -39,41 +55,59 @@ InputBox.MultiLine = true
 InputBox.ClearTextOnFocus = false
 InputBox.PlaceholderText = "-- Dán code chứa link HttpGet vào đây..."
 InputBox.Text = ""
-InputBox.Parent = MainFrame
+InputBox.Parent = InputContainer
 
--- Thanh công cụ Mode & Cài đặt (Nằm ngay dưới ô nhập code)
+local ClearBtn = Instance.new("TextButton")
+ClearBtn.Size = UDim2.new(0, 45, 1, 0)
+ClearBtn.Position = UDim2.new(1, -45, 0, 0)
+ClearBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearBtn.TextSize = 12
+ClearBtn.Font = Enum.Font.SourceSansBold
+ClearBtn.Text = "Clear"
+ClearBtn.Parent = InputContainer
+
+-- Thanh công cụ Mode, Cài đặt dòng & Nút GitHub
 local ToolBar = Instance.new("Frame")
 ToolBar.Size = UDim2.new(1, -20, 0, 30)
-ToolBar.Position = UDim2.new(0, 10, 0, 115)
+ToolBar.Position = UDim2.new(0, 10, 0, 125)
 ToolBar.BackgroundTransparency = 1
 ToolBar.Parent = MainFrame
 
--- Nút đổi Mode (Mode 1: Một Trang / Mode 2: Nhiều Trang)
 local ModeBtn = Instance.new("TextButton")
-ModeBtn.Size = UDim2.new(0, 160, 1, 0)
+ModeBtn.Size = UDim2.new(0, 110, 1, 0)
 ModeBtn.Position = UDim2.new(0, 0, 0, 0)
 ModeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 ModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ModeBtn.TextSize = 12
+ModeBtn.TextSize = 11
 ModeBtn.Font = Enum.Font.SourceSansBold
-ModeBtn.Text = "Mode: 🌐 Nhiều Trang"
+ModeBtn.Text = "Mode: 🌐 Nhiều"
 ModeBtn.Parent = ToolBar
 
--- Nút 3 chấm (...) mở menu cài đặt giới hạn dòng
 local SettingsBtn = Instance.new("TextButton")
-SettingsBtn.Size = UDim2.new(0, 40, 1, 0)
-SettingsBtn.Position = UDim2.new(0, 165, 0, 0)
+SettingsBtn.Size = UDim2.new(0, 30, 1, 0)
+SettingsBtn.Position = UDim2.new(0, 115, 0, 0)
 SettingsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 SettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SettingsBtn.TextSize = 14
+SettingsBtn.TextSize = 12
 SettingsBtn.Font = Enum.Font.SourceSansBold
 SettingsBtn.Text = "..."
 SettingsBtn.Parent = ToolBar
 
--- Nút thực thi chính
+-- Nút Upload GitHub (Tự động đẩy code lên Repo của ní)
+local GitBtn = Instance.new("TextButton")
+GitBtn.Size = UDim2.new(0, 35, 1, 0)
+GitBtn.Position = UDim2.new(0, 150, 0, 0)
+GitBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 90)
+GitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+GitBtn.TextSize = 12
+GitBtn.Font = Enum.Font.SourceSansBold
+GitBtn.Text = "🐙"
+GitBtn.Parent = ToolBar
+
 local ExecButton = Instance.new("TextButton")
-ExecButton.Size = UDim2.new(1, -210, 1, 0)
-ExecButton.Position = UDim2.new(0, 210, 0, 0)
+ExecButton.Size = UDim2.new(1, -190, 1, 0)
+ExecButton.Position = UDim2.new(0, 190, 0, 0)
 ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
 ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ExecButton.TextSize = 12
@@ -81,47 +115,57 @@ ExecButton.Font = Enum.Font.SourceSansBold
 ExecButton.Text = "⚡ BÓC TÁC"
 ExecButton.Parent = ToolBar
 
--- Thanh điều hướng trang (Chỉ hiện khi ở Mode 2)
+-- Thanh điều hướng trang & Nút Copy
 local NavFrame = Instance.new("Frame")
 NavFrame.Size = UDim2.new(1, -20, 0, 30)
-NavFrame.Position = UDim2.new(0, 10, 0, 150)
+NavFrame.Position = UDim2.new(0, 10, 0, 160)
 NavFrame.BackgroundTransparency = 1
 NavFrame.Parent = MainFrame
 
 local PrevBtn = Instance.new("TextButton")
-PrevBtn.Size = UDim2.new(0, 85, 1, 0)
+PrevBtn.Size = UDim2.new(0, 70, 1, 0)
 PrevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PrevBtn.TextSize = 12
+PrevBtn.TextSize = 11
 PrevBtn.Font = Enum.Font.SourceSansBold
-PrevBtn.Text = "⬅️ Trang trước"
+PrevBtn.Text = "⬅️ Trước"
 PrevBtn.Parent = NavFrame
 
 local PageLabel = Instance.new("TextLabel")
-PageLabel.Size = UDim2.new(1, -180, 1, 0)
-PageLabel.Position = UDim2.new(0, 90, 0, 0)
+PageLabel.Size = UDim2.new(1, -220, 1, 0)
+PageLabel.Position = UDim2.new(0, 75, 0, 0)
 PageLabel.BackgroundTransparency = 1
 PageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-PageLabel.TextSize = 13
+PageLabel.TextSize = 12
 PageLabel.Font = Enum.Font.SourceSansBold
 PageLabel.Text = "Trang: 0 / 0"
 PageLabel.TextXAlignment = Enum.TextXAlignment.Center
 PageLabel.Parent = NavFrame
 
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(0, 65, 1, 0)
+CopyBtn.Position = UDim2.new(1, -145, 0, 0)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.TextSize = 11
+CopyBtn.Font = Enum.Font.SourceSansBold
+CopyBtn.Text = "📋 Copy"
+CopyBtn.Parent = NavFrame
+
 local NextBtn = Instance.new("TextButton")
-NextBtn.Size = UDim2.new(0, 85, 1, 0)
-NextBtn.Position = UDim2.new(1, -85, 0, 0)
+NextBtn.Size = UDim2.new(0, 70, 1, 0)
+NextBtn.Position = UDim2.new(1, -70, 0, 0)
 NextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-NextBtn.TextSize = 12
+NextBtn.TextSize = 11
 NextBtn.Font = Enum.Font.SourceSansBold
-NextBtn.Text = "Trang sau ➡️"
+NextBtn.Text = "Sau ➡️"
 NextBtn.Parent = NavFrame
 
 -- Khung hiển thị kết quả
 local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Size = UDim2.new(1, -20, 0, 265)
-ScrollingFrame.Position = UDim2.new(0, 10, 0, 190)
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 290)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 200)
 ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 ScrollingFrame.BorderSizePixel = 0
 ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -142,15 +186,13 @@ OutputBox.TextYAlignment = Enum.TextYAlignment.Top
 OutputBox.Text = "-- Kết quả sẽ hiện ở đây..."
 OutputBox.Parent = ScrollingFrame
 
--- =========================================================================
--- MENU CÀI ĐẶT NỔI (POPUP CHỈNH SỐ DÒNG)
--- =========================================================================
+-- Popup Cài đặt giới hạn số dòng
 local SettingsPopup = Instance.new("Frame")
 SettingsPopup.Size = UDim2.new(0, 240, 0, 140)
 SettingsPopup.Position = UDim2.new(0.5, -120, 0.5, -70)
 SettingsPopup.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 SettingsPopup.BorderSizePixel = 0
-SettingsPopup.Visible = false -- Mặc định ẩn
+SettingsPopup.Visible = false
 SettingsPopup.ZIndex = 5
 SettingsPopup.Parent = MainFrame
 
@@ -183,7 +225,7 @@ LineInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 LineInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 LineInput.TextSize = 13
 LineInput.Font = Enum.Font.Code
-LineInput.Text = "500" -- Mặc định 500 dòng mỗi trang
+LineInput.Text = "500"
 LineInput.ZIndex = 5
 LineInput.Parent = SettingsPopup
 
@@ -213,31 +255,92 @@ SaveSettingsBtn.MouseButton1Click:Connect(function()
     SettingsPopup.Visible = false
 end)
 
+ClearBtn.MouseButton1Click:Connect(function()
+    InputBox.Text = ""
+end)
+
+CopyBtn.MouseButton1Click:Connect(function()
+    local textToCopy = OutputBox.Text
+    if textToCopy and textToCopy ~= "-- Kết quả sẽ hiện ở đây..." then
+        Clipboard(textToCopy)
+        CopyBtn.Text = "✅ Copied!"
+        task.delay(1.5, function()
+            CopyBtn.Text = "📋 Copy"
+        end)
+    end
+end)
+
+-- =========================================================================
+-- LOGIC GITHUB API (ĐÃ TÍCH HỢP SẴN TOKEN & REPO CỦA NÍ)
+-- =========================================================================
+local GITHUB_TOKEN = "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"
+local GITHUB_REPO = "Chillguy10012011-crypto/Script"
+
+GitBtn.MouseButton1Click:Connect(function()
+    if not httpRequest then
+        OutputBox.Text = "❌ Lỗi: Executor không hỗ trợ httpRequest() để gọi GitHub API!"
+        return
+    end
+
+    local fullText = table.concat(rawCapturedLogs or {}, "\n")
+    if fullText == "" or fullText == "-- Kết quả sẽ hiện ở đây..." then
+        OutputBox.Text = "⚠️ Chưa có code nào được bóc tách để đẩy lên GitHub!"
+        return
+    end
+
+    OutputBox.Text = "🐙 Đang đẩy toàn bộ code lên GitHub..."
+
+    local fileName = "Deobfuscated_" .. os.time() .. ".lua"
+    local url = string.format("https://api.github.com/repos/%s/contents/%s", GITHUB_REPO, fileName)
+    
+    local success, response = pcall(function()
+        return httpRequest({
+            Url = url,
+            Method = "PUT",
+            Headers = {
+                ["Authorization"] = "Bearer " .. GITHUB_TOKEN,
+                ["Content-Type"] = "application/json",
+                ["User-Agent"] = "Roblox-Deobfuscator"
+            },
+            Body = HttpService:JSONEncode({
+                message = "Auto-upload deobfuscated script via Mobile GUI",
+                content = crypt and crypt.base64encode(fullText) or HttpService:Base64Encode(fullText)
+            })
+        })
+    end)
+
+    if success and response and (response.StatusCode == 201 or response.StatusCode == 200) then
+        OutputBox.Text = string.format("✅ Đẩy lên GitHub thành công!\n📁 Repo: %s\n📄 File: %s", GITHUB_REPO, fileName)
+    else
+        local errInfo = (response and response.Body) or "Lỗi kết nối"
+        OutputBox.Text = "❌ Đẩy lên GitHub thất bại:\n" .. tostring(errInfo)
+    end
+end)
+
 -- =========================================================================
 -- LOGIC QUẢN LÝ MODE & HIỂN THỊ TRANG
 -- =========================================================================
-local currentMode = 2 -- Mặc định Mode 2: Nhiều Trang
-local rawCapturedLogs = {}
+local currentMode = 2
+rawCapturedLogs = {}
+local pages = {}
+local currentPage = 1
 
 ModeBtn.MouseButton1Click:Connect(function()
     if currentMode == 2 then
         currentMode = 1
-        ModeBtn.Text = "Mode: 📄 Một Trang"
+        ModeBtn.Text = "Mode: 📄 Một"
         NavFrame.Visible = false
-        ScrollingFrame.Size = UDim2.new(1, -20, 0, 295)
-        ScrollingFrame.Position = UDim2.new(0, 10, 0, 160)
+        ScrollingFrame.Size = UDim2.new(1, -20, 0, 320)
+        ScrollingFrame.Position = UDim2.new(0, 10, 0, 170)
     else
         currentMode = 2
-        ModeBtn.Text = "Mode: 🌐 Nhiều Trang"
+        ModeBtn.Text = "Mode: 🌐 Nhiều"
         NavFrame.Visible = true
-        ScrollingFrame.Size = UDim2.new(1, -20, 0, 265)
-        ScrollingFrame.Position = UDim2.new(0, 10, 0, 190)
+        ScrollingFrame.Size = UDim2.new(1, -20, 0, 290)
+        ScrollingFrame.Position = UDim2.new(0, 10, 0, 200)
     end
     updateDisplay()
 end)
-
-local pages = {}
-local currentPage = 1
 
 function updateDisplay()
     if #rawCapturedLogs == 0 then
@@ -250,14 +353,12 @@ function updateDisplay()
     local fullText = table.concat(rawCapturedLogs, "\n")
 
     if currentMode == 1 then
-        -- Mode 1: Gom tất cả vào 1 trang duy nhất
         PageLabel.Text = "Mode: Một Trang"
         OutputBox.Text = fullText
         local lines = 1
         for _ in fullText:gmatch("\n") do lines = lines + 1 end
-        OutputBox.Size = UDim2.new(1, 0, 0, math.max(295, lines * 15 + 20))
+        OutputBox.Size = UDim2.new(1, 0, 0, math.max(320, lines * 15 + 20))
     else
-        -- Mode 2: Chia theo giới hạn số dòng người dùng cài đặt
         local maxLinesPerTrang = tonumber(LineInput.Text) or 500
         pages = {}
         
@@ -286,7 +387,7 @@ function updateDisplay()
         
         local lines = 1
         for _ in pageText:gmatch("\n") do lines = lines + 1 end
-        OutputBox.Size = UDim2.new(1, 0, 0, math.max(265, lines * 15 + 20))
+        OutputBox.Size = UDim2.new(1, 0, 0, math.max(290, lines * 15 + 20))
     end
 end
 
@@ -304,9 +405,9 @@ NextBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- -------------------------------------------------------------------------
--- LOGIC BẪY BÓC TÁC CODE
--- -------------------------------------------------------------------------
+-- =========================================================================
+-- LOGIC BẪY BÓC TÁC ĐA TẦNG & HTTPGET
+-- =========================================================================
 ExecButton.MouseButton1Click:Connect(function()
     local rawCode = InputBox.Text
     if rawCode == "" then
