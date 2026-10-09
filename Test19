@@ -1,0 +1,121 @@
+-- Roblox GUI Script: Decoder & Executor Tool
+local CoreGui = game:GetService("CoreGui")
+
+-- Xóa GUI cũ nếu chạy lại script nhiều lần
+if CoreGui:FindFirstChild("CustomDecoderGUI") then
+    CoreGui.CustomDecoderGUI:Destroy()
+end
+
+-- Tạo ScreenGui chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomDecoderGUI"
+ScreenGui.Parent = CoreGui
+
+-- Khung nền chính (Main Frame)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 560, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -280, 0.5, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- Cho phép kéo thả cửa sổ GUI
+MainFrame.Parent = ScreenGui
+
+-- Tiêu đề GUI
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "Roblox Lua Decoder & Executor"
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.Parent = MainFrame
+
+-- 1. Khung nhập code mã hóa hoặc chuỗi loadstring (Bên trái)
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(0.47, 0, 0.70, 0)
+InputBox.Position = UDim2.new(0.02, 0, 0.13, 0)
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+InputBox.PlaceholderText = "Dán code mã hóa hoặc loadstring vào đây..."
+InputBox.Text = ""
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.Font = Enum.Font.Code
+InputBox.TextSize = 12
+InputBox.TextXAlignment = Enum.TextXAlignment.Left
+InputBox.TextYAlignment = Enum.TextYAlignment.Top
+InputBox.Parent = MainFrame
+
+-- 2. Khung hiển thị code sau khi được giải mã (Bên phải)
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(0.47, 0, 0.70, 0)
+OutputBox.Position = UDim2.new(0.51, 0, 0.13, 0)
+OutputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+OutputBox.TextColor3 = Color3.fromRGB(100, 255, 100) -- Chữ màu xanh lá báo hiệu code sạch/đã giải mã
+InputBox.PlaceholderText = "Code sau khi giải mã sẽ hiện ở đây..."
+OutputBox.Text = ""
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.Font = Enum.Font.Code
+OutputBox.TextSize = 12
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Parent = MainFrame
+
+-- 3. Nút bấm Execute & Decode (Nằm phía dưới khung nhập code bên trái)
+local ExecButton = Instance.new("TextButton")
+ExecButton.Size = UDim2.new(0.47, 0, 0, 35)
+ExecButton.Position = UDim2.new(0.02, 0, 0.86, 0)
+ExecButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecButton.Text = "Execute & Decode"
+ExecButton.Font = Enum.Font.SourceSansBold
+ExecButton.TextSize = 14
+ExecButton.Parent = MainFrame
+
+-- Thêm nhãn chú thích nhỏ cho khung bên phải
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(0.47, 0, 0, 25)
+OutputLabel.Position = UDim2.new(0.51, 0, 0.86, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+OutputLabel.Text = "Decoded Source Output"
+OutputLabel.Font = Enum.Font.SourceSansItalic
+OutputLabel.TextSize = 12
+OutputLabel.Parent = MainFrame
+
+-- Xử lý sự kiện khi nhấn nút
+ExecButton.MouseButton1Click:Connect(function()
+    local rawInput = InputBox.Text
+    
+    if rawInput == "" then
+        OutputBox.Text = "-- Lỗi: Vui lòng nhập code hoặc chuỗi loadstring!"
+        return
+    end
+
+    local success, result = pcall(function()
+        local decodedCode = rawInput
+        
+        --[[ 
+            LƯU Ý: Nếu chuỗi bạn nhập vào là một dạng mã hóa cụ thể (Ví dụ: Base64, hàm giải mã riêng...), 
+            bạn có thể thay thế đoạn xử lý dưới đây bằng hàm decode tương ứng của bạn.
+            Ví dụ nếu là loadstring bọc trong hàm mã hóa: decodedCode = HamGiaiMa(rawInput)
+        ]]--
+
+        -- Hiển thị mã đã giải mã vào khung bên phải để bạn bắt khoảnh khắc và copy
+        OutputBox.Text = decodedCode
+        
+        -- Thực thi đoạn code vừa giải mã
+        local runFunc, loadErr = loadstring(decodedCode)
+        if runFunc then
+            runFunc()
+        else
+            OutputBox.Text = "-- Lỗi biên dịch (Loadstring Error):\n" .. tostring(loadErr)
+        end
+    end)
+
+    if not success then
+        OutputBox.Text = "-- Lỗi thực thi:\n" .. tostring(result)
+    end
+end)
