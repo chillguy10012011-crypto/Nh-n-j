@@ -1,0 +1,455 @@
+-- Tạo GUI thuần túy (Phiên bản Ultimate Pro: Thêm Copy & Clear)
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local Clipboard = setclipboard or toclipboard or function(txt)
+    -- Fallback nếu executor không hỗ trợ setclipboard trực tiếp
+    print("[Clipboard Fallback]: " .. txt)
+end
+
+if CoreGui:FindFirstChild("DefuscatorGUI") then
+    CoreGui["DefuscatorGUI"]:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DefuscatorGUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 360, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -260)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = " 📱 Bẫy Deobfuscator Ultimate (Copy & Clear)"
+Title.Parent = MainFrame
+
+-- Khung chứa Ô nhập code & Nút Clear
+local InputContainer = Instance.new("Frame")
+InputContainer.Size = UDim2.new(1, -20, 0, 75)
+InputContainer.Position = UDim2.new(0, 10, 0, 40)
+InputContainer.BackgroundTransparency = 1
+InputContainer.Parent = MainFrame
+
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(1, -55, 1, 0)
+InputBox.Position = UDim2.new(0, 0, 0, 0)
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
+InputBox.TextSize = 12
+InputBox.Font = Enum.Font.Code
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.PlaceholderText = "-- Dán code chứa link HttpGet vào đây..."
+InputBox.Text = ""
+InputBox.Parent = InputContainer
+
+-- Nút Clear (Xóa nhanh ô nhập code)
+local ClearBtn = Instance.new("TextButton")
+ClearBtn.Size = UDim2.new(0, 45, 1, 0)
+ClearBtn.Position = UDim2.new(1, -45, 0, 0)
+ClearBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearBtn.TextSize = 12
+ClearBtn.Font = Enum.Font.SourceSansBold
+ClearBtn.Text = "Clear"
+ClearBtn.Parent = InputContainer
+
+-- Thanh công cụ Mode, Cài đặt & Bóc tách
+local ToolBar = Instance.new("Frame")
+ToolBar.Size = UDim2.new(1, -20, 0, 30)
+ToolBar.Position = UDim2.new(0, 10, 0, 125)
+ToolBar.BackgroundTransparency = 1
+ToolBar.Parent = MainFrame
+
+local ModeBtn = Instance.new("TextButton")
+ModeBtn.Size = UDim2.new(0, 140, 1, 0)
+ModeBtn.Position = UDim2.new(0, 0, 0, 0)
+ModeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+ModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ModeBtn.TextSize = 12
+ModeBtn.Font = Enum.Font.SourceSansBold
+ModeBtn.Text = "Mode: 🌐 Nhiều Trang"
+ModeBtn.Parent = ToolBar
+
+local SettingsBtn = Instance.new("TextButton")
+SettingsBtn.Size = UDim2.new(0, 35, 1, 0)
+SettingsBtn.Position = UDim2.new(0, 145, 0, 0)
+SettingsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+SettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsBtn.TextSize = 14
+SettingsBtn.Font = Enum.Font.SourceSansBold
+SettingsBtn.Text = "..."
+SettingsBtn.Parent = ToolBar
+
+local ExecButton = Instance.new("TextButton")
+ExecButton.Size = UDim2.new(1, -185, 1, 0)
+ExecButton.Position = UDim2.new(0, 185, 0, 0)
+ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecButton.TextSize = 12
+ExecButton.Font = Enum.Font.SourceSansBold
+ExecButton.Text = "⚡ BÓC TÁC"
+ExecButton.Parent = ToolBar
+
+-- Thanh điều hướng trang (Chỉ hiện ở Mode 2) & Nút Copy
+local NavFrame = Instance.new("Frame")
+NavFrame.Size = UDim2.new(1, -20, 0, 30)
+NavFrame.Position = UDim2.new(0, 10, 0, 160)
+NavFrame.BackgroundTransparency = 1
+NavFrame.Parent = MainFrame
+
+local PrevBtn = Instance.new("TextButton")
+PrevBtn.Size = UDim2.new(0, 70, 1, 0)
+PrevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PrevBtn.TextSize = 11
+PrevBtn.Font = Enum.Font.SourceSansBold
+PrevBtn.Text = "⬅️ Trước"
+PrevBtn.Parent = NavFrame
+
+local PageLabel = Instance.new("TextLabel")
+PageLabel.Size = UDim2.new(1, -220, 1, 0)
+PageLabel.Position = UDim2.new(0, 75, 0, 0)
+PageLabel.BackgroundTransparency = 1
+PageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PageLabel.TextSize = 12
+PageLabel.Font = Enum.Font.SourceSansBold
+PageLabel.Text = "Trang: 0 / 0"
+PageLabel.TextXAlignment = Enum.TextXAlignment.Center
+PageLabel.Parent = NavFrame
+
+-- Nút Copy trang hiện tại
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(0, 65, 1, 0)
+CopyBtn.Position = UDim2.new(1, -145, 0, 0)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.TextSize = 11
+CopyBtn.Font = Enum.Font.SourceSansBold
+CopyBtn.Text = "📋 Copy"
+CopyBtn.Parent = NavFrame
+
+local NextBtn = Instance.new("TextButton")
+NextBtn.Size = UDim2.new(0, 70, 1, 0)
+NextBtn.Position = UDim2.new(1, -70, 0, 0)
+NextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NextBtn.TextSize = 11
+NextBtn.Font = Enum.Font.SourceSansBold
+NextBtn.Text = "Sau ➡️"
+NextBtn.Parent = NavFrame
+
+-- Khung hiển thị kết quả
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 290)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 200)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollingFrame.Parent = MainFrame
+
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(1, 0, 0, 0)
+OutputBox.Position = UDim2.new(0, 0, 0, 0)
+OutputBox.BackgroundTransparency = 1
+OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
+OutputBox.TextSize = 12
+OutputBox.Font = Enum.Font.Code
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Text = "-- Kết quả sẽ hiện ở đây..."
+OutputBox.Parent = ScrollingFrame
+
+-- =========================================================================
+-- MENU CÀI ĐẶT NỔI (POPUP CHỈNH SỐ DÒNG)
+-- =========================================================================
+local SettingsPopup = Instance.new("Frame")
+SettingsPopup.Size = UDim2.new(0, 240, 0, 140)
+SettingsPopup.Position = UDim2.new(0.5, -120, 0.5, -70)
+SettingsPopup.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SettingsPopup.BorderSizePixel = 0
+SettingsPopup.Visible = false
+SettingsPopup.ZIndex = 5
+SettingsPopup.Parent = MainFrame
+
+local PopupTitle = Instance.new("TextLabel")
+PopupTitle.Size = UDim2.new(1, 0, 0, 30)
+PopupTitle.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+PopupTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PopupTitle.TextSize = 13
+PopupTitle.Font = Enum.Font.SourceSansBold
+PopupTitle.Text = "⚙️ Cài đặt giới hạn số dòng"
+PopupTitle.ZIndex = 5
+PopupTitle.Parent = SettingsPopup
+
+local PopupDesc = Instance.new("TextLabel")
+PopupDesc.Size = UDim2.new(1, -10, 0, 25)
+PopupDesc.Position = UDim2.new(0, 5, 0, 35)
+PopupDesc.BackgroundTransparency = 1
+PopupDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
+PopupDesc.TextSize = 11
+PopupDesc.Font = Enum.Font.SourceSans
+PopupDesc.Text = "Nhập số dòng mỗi trang (Tối đa 10000):"
+PopupDesc.TextXAlignment = Enum.TextXAlignment.Left
+PopupDesc.ZIndex = 5
+PopupDesc.Parent = SettingsPopup
+
+local LineInput = Instance.new("TextBox")
+LineInput.Size = UDim2.new(1, -20, 0, 30)
+LineInput.Position = UDim2.new(0, 10, 0, 65)
+LineInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+LineInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+LineInput.TextSize = 13
+LineInput.Font = Enum.Font.Code
+LineInput.Text = "500"
+LineInput.ZIndex = 5
+LineInput.Parent = SettingsPopup
+
+local SaveSettingsBtn = Instance.new("TextButton")
+SaveSettingsBtn.Size = UDim2.new(1, -20, 0, 28)
+SaveSettingsBtn.Position = UDim2.new(0, 10, 0, 102)
+SaveSettingsBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+SaveSettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SaveSettingsBtn.TextSize = 12
+SaveSettingsBtn.Font = Enum.Font.SourceSansBold
+SaveSettingsBtn.Text = "Lưu & Đóng"
+SaveSettingsBtn.ZIndex = 5
+SaveSettingsBtn.Parent = SettingsPopup
+
+SettingsBtn.MouseButton1Click:Connect(function()
+    SettingsPopup.Visible = not SettingsPopup.Visible
+end)
+
+SaveSettingsBtn.MouseButton1Click:Connect(function()
+    local val = tonumber(LineInput.Text)
+    if val then
+        if val > 10000 then LineInput.Text = "10000" end
+        if val < 10 then LineInput.Text = "10" end
+    else
+        LineInput.Text = "500"
+    end
+    SettingsPopup.Visible = false
+end)
+
+-- Xóa nhanh ô nhập code khi bấm Clear
+ClearBtn.MouseButton1Click:Connect(function()
+    InputBox.Text = ""
+end)
+
+-- Copy nội dung trang hiện tại
+CopyBtn.MouseButton1Click:Connect(function()
+    local textToCopy = OutputBox.Text
+    if textToCopy and textToCopy ~= "-- Kết quả sẽ hiện ở đây..." then
+        Clipboard(textToCopy)
+        CopyBtn.Text = "✅ Copied!"
+        task.delay(1.5, function()
+            CopyBtn.Text = "📋 Copy"
+        end)
+    end
+end)
+
+-- =========================================================================
+-- LOGIC QUẢN LÝ MODE & HIỂN THỊ TRANG
+-- =========================================================================
+local currentMode = 2
+local rawCapturedLogs = {}
+
+ModeBtn.MouseButton1Click:Connect(function()
+    if currentMode == 2 then
+        currentMode = 1
+        ModeBtn.Text = "Mode: 📄 Một Trang"
+        NavFrame.Visible = false
+        ScrollingFrame.Size = UDim2.new(1, -20, 0, 320)
+        ScrollingFrame.Position = UDim2.new(0, 10, 0, 170)
+    else
+        currentMode = 2
+        ModeBtn.Text = "Mode: 🌐 Nhiều Trang"
+        NavFrame.Visible = true
+        ScrollingFrame.Size = UDim2.new(1, -20, 0, 290)
+        ScrollingFrame.Position = UDim2.new(0, 10, 0, 200)
+    end
+    updateDisplay()
+end)
+
+local pages = {}
+local currentPage = 1
+
+function updateDisplay()
+    if #rawCapturedLogs == 0 then
+        PageLabel.Text = "Trang: 0 / 0"
+        OutputBox.Text = "-- Không có dữ liệu."
+        OutputBox.Size = UDim2.new(1, 0, 0, 0)
+        return
+    end
+
+    local fullText = table.concat(rawCapturedLogs, "\n")
+
+    if currentMode == 1 then
+        PageLabel.Text = "Mode: Một Trang"
+        OutputBox.Text = fullText
+        local lines = 1
+        for _ in fullText:gmatch("\n") do lines = lines + 1 end
+        OutputBox.Size = UDim2.new(1, 0, 0, math.max(320, lines * 15 + 20))
+    else
+        local maxLinesPerTrang = tonumber(LineInput.Text) or 500
+        pages = {}
+        
+        local currentChunkLines = {}
+        local lineCount = 0
+        
+        for line in (fullText .. "\n"):gmatch("(.-)\n") do
+            table.insert(currentChunkLines, line)
+            lineCount = lineCount + 1
+            if lineCount >= maxLinesPerTrang then
+                table.insert(pages, table.concat(currentChunkLines, "\n"))
+                currentChunkLines = {}
+                lineCount = 0
+            end
+        end
+        if #currentChunkLines > 0 then
+            table.insert(pages, table.concat(currentChunkLines, "\n"))
+        end
+
+        if currentPage < 1 then currentPage = 1 end
+        if currentPage > #pages then currentPage = #pages end
+        
+        PageLabel.Text = string.format("Trang: %d / %d", currentPage, #pages)
+        local pageText = pages[currentPage] or ""
+        OutputBox.Text = pageText
+        
+        local lines = 1
+        for _ in pageText:gmatch("\n") do lines = lines + 1 end
+        OutputBox.Size = UDim2.new(1, 0, 0, math.max(290, lines * 15 + 20))
+    end
+end
+
+PrevBtn.MouseButton1Click:Connect(function()
+    if currentMode == 2 and currentPage > 1 then
+        currentPage = currentPage - 1
+        updateDisplay()
+    end
+end)
+
+NextBtn.MouseButton1Click:Connect(function()
+    if currentMode == 2 and currentPage < #pages then
+        currentPage = currentPage + 1
+        updateDisplay()
+    end
+end)
+
+-- -------------------------------------------------------------------------
+-- LOGIC BẪY BÓC TÁC CODE
+-- -------------------------------------------------------------------------
+ExecButton.MouseButton1Click:Connect(function()
+    local rawCode = InputBox.Text
+    if rawCode == "" then
+        OutputBox.Text = "⚠️ Lỗi: Vui lòng nhập code!"
+        return
+    end
+
+    OutputBox.Text = "⏳ Đang bóc tách dữ liệu..."
+    rawCapturedLogs = {}
+    pages = {}
+    currentPage = 1
+
+    local old_loadstring = loadstring
+    local loadCount = 0
+
+    local interceptedHttpGet = function(self, url)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- [HTTPGET #%d]: %s\n", loadCount, tostring(url))
+        
+        local success, fileContent = pcall(function()
+            return game:HttpGet(url)
+        end)
+        
+        if success then
+            table.insert(rawCapturedLogs, header .. fileContent)
+            updateDisplay()
+            return fileContent
+        else
+            table.insert(rawCapturedLogs, header .. "-- [LỖI TẢI LINK]")
+            updateDisplay()
+            return ""
+        end
+    end
+
+    local function recursiveTrap(codeChunk, chunkName)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- [LOADSTRING #%d] - Chunk: %s\n", loadCount, tostring(chunkName))
+        table.insert(rawCapturedLogs, header .. tostring(codeChunk))
+        updateDisplay()
+        
+        local realFunc, loadErr = old_loadstring(codeChunk, chunkName)
+        if realFunc then
+            local envProxy
+            envProxy = setmetatable({
+                loadstring = function(subChunk, subName)
+                    return recursiveTrap(subChunk, subName)
+                end,
+                game = setmetatable({
+                    HttpGet = function(s, u)
+                        return interceptedHttpGet(s, u)
+                    end
+                }, {
+                    __index = game
+                })
+            }, {
+                __index = getgenv(),
+            })
+            
+            setfenv(realFunc, envProxy)
+            pcall(realFunc)
+            return realFunc
+        else
+            return function() end
+        end
+    end
+
+    getgenv().loadstring = function(codeChunk, chunkName)
+        return recursiveTrap(codeChunk, chunkName)
+    end
+
+    local envProxyTop = setmetatable({
+        game = setmetatable({
+            HttpGet = function(s, u)
+                return interceptedHttpGet(s, u)
+            end
+        }, {
+            __index = game
+        })
+    }, {
+        __index = getgenv(),
+    })
+
+    local success, err = pcall(function()
+        local func, loadErr = old_loadstring(rawCode)
+        if func then
+            setfenv(func, envProxyTop)
+            func()
+        else
+            OutputBox.Text = "❌ Lỗi cú pháp ban đầu:\n" .. tostring(loadErr)
+        end
+    end)
+
+    getgenv().loadstring = old_loadstring
+
+    if not success and #rawCapturedLogs == 0 then
+        OutputBox.Text = "⚠️ Lỗi thực thi:\n" .. tostring(err)
+    elseif #rawCapturedLogs > 0 then
+        updateDisplay()
+    end
+end)
