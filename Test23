@@ -1,0 +1,144 @@
+-- Tạo GUI thuần túy (Phiên bản gom tất cả các lần loadstring)
+local CoreGui = game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("DefuscatorGUI") then
+    CoreGui["DefuscatorGUI"]:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DefuscatorGUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 550, 0, 480)
+MainFrame.Position = UDim2.new(0.5, -275, 0.5, -240)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = " 🕵️‍♂️ Bắt Tất Cả Khoảnh Khắc Giải Mã Code (Multi-Loadstring)"
+Title.Parent = MainFrame
+
+local InputBox = Instance.new("TextBox")
+InputBox.Size = UDim2.new(1, -20, 0, 110)
+InputBox.Position = UDim2.new(0, 10, 0, 50)
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
+InputBox.TextSize = 13
+InputBox.Font = Enum.Font.Code
+InputBox.MultiLine = true
+InputBox.ClearTextOnFocus = false
+InputBox.PlaceholderText = "-- Dán code mã hóa của hacker vào đây..."
+InputBox.Text = ""
+InputBox.Parent = MainFrame
+
+local ExecButton = Instance.new("TextButton")
+ExecButton.Size = UDim2.new(1, -20, 0, 35)
+ExecButton.Position = UDim2.new(0, 10, 0, 170)
+ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecButton.TextSize = 15
+ExecButton.Font = Enum.Font.SourceSansBold
+ExecButton.Text = "⚡ THỰC THI & GOM TẤT CẢ KHOẢNH KHẮC"
+ExecButton.Parent = MainFrame
+
+local OutputTitle = Instance.new("TextLabel")
+OutputTitle.Size = UDim2.new(1, -20, 0, 20)
+OutputTitle.Position = UDim2.new(0, 10, 0, 210)
+OutputTitle.BackgroundTransparency = 1
+OutputTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+OutputTitle.TextSize = 14
+OutputTitle.Font = Enum.Font.SourceSansBold
+OutputTitle.Text = "📜 Tất cả các đoạn code đã giải mã (Theo thứ tự):"
+OutputTitle.TextXAlignment = Enum.TextXAlignment.Left
+OutputTitle.Parent = MainFrame
+
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 215)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 235)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 3, 0)
+ScrollingFrame.Parent = MainFrame
+
+local OutputBox = Instance.new("TextBox")
+OutputBox.Size = UDim2.new(1, 0, 1, 0)
+OutputBox.Position = UDim2.new(0, 0, 0, 0)
+OutputBox.BackgroundTransparency = 1
+OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
+OutputBox.TextSize = 13
+OutputBox.Font = Enum.Font.Code
+OutputBox.MultiLine = true
+OutputBox.ClearTextOnFocus = false
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+OutputBox.Text = "-- Kết quả từ tất cả các lần gọi loadstring sẽ hiển thị ở đây..."
+OutputBox.Parent = ScrollingFrame
+
+-- -------------------------------------------------------------------------
+-- LOGIC BẪY NÂNG CẤP: GOM TẤT CẢ CÁC LẦN LOADSTRING
+-- -------------------------------------------------------------------------
+ExecButton.MouseButton1Click:Connect(function()
+    local rawCode = InputBox.Text
+    if rawCode == "" then
+        OutputBox.Text = "⚠️ Lỗi: Vui lòng nhập code vào khung bên trên!"
+        return
+    end
+
+    OutputBox.Text = "⏳ Đang chạy và thu thập các tầng giải mã..."
+
+    local old_loadstring = loadstring
+    local capturedChunks = {} -- Bảng lưu trữ toàn bộ các đoạn code được bẫy lại
+    local loadCount = 0
+
+    -- Bẫy hàm loadstring
+    getgenv().loadstring = function(codeChunk, chunkName)
+        loadCount = loadCount + 1
+        local header = string.format("\n\n-- ========================================\n-- [LẦN GỌI THỨ %d] - Chunk: %s\n-- ========================================\n", loadCount, tostring(chunkName))
+        local fullChunkContent = header .. tostring(codeChunk)
+        
+        -- Lưu vào danh sách thay vì ghi đè
+        table.insert(capturedChunks, fullChunkContent)
+        
+        -- Cập nhật trực tiếp lên màn hình kết quả ngay khi bắt được từng lớp
+        OutputBox.Text = table.concat(capturedChunks, "\n")
+        
+        -- Chặn không cho chạy tiếp để đảm bảo an toàn, trả về hàm trống giả lập
+        return function()
+            -- Cho phép nó tiếp tục chuỗi giải mã nếu các tầng sau cần gọi tiếp hàm trả về
+        end
+    end
+
+    local envProxy = setmetatable({}, {
+        __index = getgenv(),
+    })
+
+    local success, err = pcall(function()
+        local func, loadErr = old_loadstring(rawCode)
+        if func then
+            setfenv(func, envProxy)
+            func()
+        else
+            OutputBox.Text = "❌ Lỗi cú pháp khi nạp code ban đầu:\n" .. tostring(loadErr)
+        end
+    end)
+
+    -- Khôi phục lại hàm loadstring gốc
+    getgenv().loadstring = old_loadstring
+
+    if not success and #capturedChunks == 0 then
+        OutputBox.Text = "⚠️ Thực thi kết thúc với lỗi:\n" .. tostring(err)
+    elseif #capturedChunks > 0 then
+        -- Thêm thông báo tổng kết hoàn tất
+        OutputBox.Text = table.concat(capturedChunks, "\n") .. "\n\n-- [HOÀN TẤT] Đã bắt trọn " .. loadCount .. " lần gọi loadstring!"
+    end
+end)
