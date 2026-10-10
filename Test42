@@ -1,0 +1,188 @@
+-- Script chạy trên Executor cho Roblox
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Xóa GUI cũ nếu đã tồn tại để tránh trùng lặp
+if CoreGui:FindFirstChild("CustomControlGUI") then
+    CoreGui.CustomControlGUI:Destroy()
+end
+
+-- Tạo ScreenGui chính
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomControlGUI"
+screenGui.ResetOnSpawn = false
+pcall(function()
+    screenGui.Parent = CoreGui
+end)
+if not screenGui.Parent then
+    screenGui.Parent = playerGui
+end
+
+-- Nút thu gọn / mở hiển thị GUI chính (Floating Button)
+local toggleMenuBtn = Instance.new("TextButton")
+toggleMenuBtn.Name = "ToggleMenuBtn"
+toggleMenuBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleMenuBtn.Position = UDim2.new(0, 20, 0, 100)
+toggleMenuBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+toggleMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleMenuBtn.Text = "GUI"
+toggleMenuBtn.TextSize = 13
+toggleMenuBtn.Font = Enum.Font.GothamBold
+toggleMenuBtn.Parent = screenGui
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(1, 0)
+btnCorner.Parent = toggleMenuBtn
+
+-- Khung GUI chính (Có thể di chuyển & bo tròn góc)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 250, 0, 160)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -80)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 12)
+frameCorner.Parent = mainFrame
+
+-- Tiêu đề GUI
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "MAIN PART CONTROL"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = mainFrame
+
+-- Nút Bật/Tắt Chức Năng chính
+local featureToggleBtn = Instance.new("TextButton")
+featureToggleBtn.Size = UDim2.new(0, 210, 0, 50)
+featureToggleBtn.Position = UDim2.new(0.5, -105, 0, 65)
+featureToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+featureToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+featureToggleBtn.Text = "Trạng thái: TẮT"
+featureToggleBtn.TextSize = 14
+featureToggleBtn.Font = Enum.Font.GothamMedium
+featureToggleBtn.Parent = mainFrame
+
+local featureCorner = Instance.new("UICorner")
+featureCorner.CornerRadius = UDim.new(0, 8)
+featureCorner.Parent = featureToggleBtn
+
+-- Sự kiện ẩn/hiện bảng GUI chính
+toggleMenuBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- Biến lưu trữ trạng thái
+local isEnabled = false
+local mainPart = nil
+local renderConnection = nil
+
+-- Xử lý logic khi bấm nút tính năng
+featureToggleBtn.MouseButton1Click:Connect(function()
+    isEnabled = not isEnabled
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        isEnabled = false
+        return
+    end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character.HumanoidRootPart
+    local camera = workspace.CurrentCamera
+    
+    if isEnabled then
+        -- KHI BẬT
+        featureToggleBtn.Text = "Trạng thái: BẬT"
+        featureToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 0)
+        
+        -- Tạo Main Part mờ và hiệu ứng lửa
+        mainPart = Instance.new("Part")
+        mainPart.Name = "MainPartEffect"
+        mainPart.Size = Vector3.new(4, 1, 4)
+        mainPart.Transparency = 0.5
+        mainPart.CanCollide = false
+        mainPart.Anchored = false
+        mainPart.CFrame = rootPart.CFrame
+        mainPart.Material = Enum.Material.Neon
+        mainPart.Color = Color3.fromRGB(255, 100, 0)
+        
+        local fire = Instance.new("Fire")
+        fire.Size = 6
+        fire.Heat = 8
+        fire.Parent = mainPart
+        
+        mainPart.Parent = workspace
+        
+        -- Chuyển camera theo dõi Main Part
+        camera.CameraSubject = mainPart
+        
+        -- Vòng lặp cập nhật vị trí và vận tốc liên tục mỗi khung hình
+        if renderConnection then renderConnection:Disconnect() end
+        renderConnection = RunService.RenderStepped:Connect(function(dt)
+            if not isEnabled or not mainPart or not mainPart.Parent then return end
+            
+            if humanoid and rootPart then
+                -- Tăng tốc độ nhân vật
+                humanoid.WalkSpeed = 500
+                
+                -- Lấy hướng di chuyển (Humanoid.MoveDirection tự động nhận diện Joystick di động và phím W,A,S,D trên PC)
+                local moveDir = humanoid.MoveDirection
+                local moveSpeed = 40
+                
+                if moveDir.Magnitude > 0 then
+                    mainPart.CFrame = mainPart.CFrame + (moveDir * moveSpeed * dt)
+                    mainPart.CFrame = CFrame.new(mainPart.Position, mainPart.Position + moveDir)
+                end
+                
+                -- Nhân vật luôn đi theo Main Part và reset vận tốc vật lý thừa
+                rootPart.CFrame = mainPart.CFrame
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end)
+        
+    else
+        -- KHI TẮT
+        featureToggleBtn.Text = "Trạng thái: TẮT"
+        featureToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        
+        if renderConnection then
+            renderConnection:Disconnect()
+            renderConnection = nil
+        end
+        
+        -- Khóa tốc độ tối đa ở mức 0 trong 2 giây
+        if humanoid then
+            humanoid.WalkSpeed = 0
+        end
+        
+        -- Đợi 2 giây rồi đưa tốc độ và góc xoay về mặc định
+        task.spawn(function()
+            task.wait(2)
+            if humanoid then
+                humanoid.WalkSpeed = 16 -- Mặc định của Roblox
+            end
+        end)
+        
+        -- Xóa Main Part
+        if mainPart then
+            mainPart:Destroy()
+            mainPart = nil
+        end
+        
+        -- Trả camera về đầu nhân vật (mặc định)
+        if character and humanoid then
+            camera.CameraSubject = humanoid
+        end
+    end
+end)
