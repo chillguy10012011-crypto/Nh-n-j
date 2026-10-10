@@ -513,45 +513,18 @@ start = function()
 			return
 		end
 
-		-- Khóa máu nhân vật liên tục ở mức 100
-		hum.Health = 100
-
-		-- 1) Quét người chơi xung quanh khối cầu trong phạm vi 15 studs
-		local targetPlayerHRP = nil
-		local shortestDist = 15 -- Bán kính tối đa 15 studs
-		
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p ~= LocalPlayer and p.Character then
-				local targetHRP = p.Character:FindFirstChild("HumanoidRootPart")
-				local targetHum = p.Character:FindFirstChildOfClass("Humanoid")
-				if targetHRP and targetHum and targetHum.Health > 0 then
-					local dist = (targetHRP.Position - fake.Position).Magnitude
-					if dist < shortestDist then
-						shortestDist = dist
-						targetPlayerHRP = targetHRP
-					end
-				end
-			end
+		-- 1) di chuyển lõi (cần điều khiển / WASD + nút lên xuống)
+		local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
+		local mv = hum.MoveDirection + Vector3.new(0, vert, 0)
+		if mv.Magnitude > 0 then
+			fake.CFrame = fake.CFrame + mv * (state.speed * CFG.SpeedUnit * dt)
 		end
 
-		-- 2) Xác định vị trí di chuyển của lõi
-		if targetPlayerHRP then
-			-- Nếu có người chơi trong phạm vi 15 studs -> Di chuyển bám theo người đó
-			fake.CFrame = targetPlayerHRP.CFrame
-		else
-			-- Nếu không có ai -> Di chuyển mặc định theo điều khiển (WASD / Cần điều khiển + Lên/Xuống)
-			local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
-			local mv = hum.MoveDirection + Vector3.new(0, vert, 0)
-			if mv.Magnitude > 0 then
-				fake.CFrame = fake.CFrame + mv * (state.speed * CFG.SpeedUnit * dt)
-			end
-		end
-
-		-- 3) giữ nhân vật tại lõi, gán vận tốc lớn
+		-- 2) giữ nhân vật tại lõi, gán vận tốc lớn
 		hrp.CFrame = fake.CFrame
 		hrp.AssemblyLinearVelocity = CFG.LinearVel * state.power
 
-		-- 4) hất: dịch nhân vật tới điểm nhắm, xoay ngẫu nhiên + vận tốc góc
+		-- 3) hất: dịch nhân vật tới điểm nhắm, xoay ngẫu nhiên + vận tốc góc
 		local target
 		if state.strikeHeld then
 			target = aimPoint()
@@ -567,15 +540,15 @@ start = function()
 			hrp.AssemblyAngularVelocity = CFG.AngularVel * state.power
 		end
 
-		-- 5) chống ngã
+		-- 4) chống ngã
 		flip = not flip
 		hum:ChangeState(flip and Enum.HumanoidStateType.Swimming or Enum.HumanoidStateType.GettingUp)
 
-		-- 6) camera bám lõi
+		-- 5) camera bám lõi
 		local cam = Workspace.CurrentCamera
 		if cam and cam.CameraSubject ~= fake then cam.CameraSubject = fake end
 
-		-- 7) màu cầu vồng cho lõi
+		-- 6) màu cầu vồng cho lõi
 		hue = (hue + dt * 0.3) % 1
 		fake.Color = Color3.fromHSV(hue, 0.8, 1)
 	end)
