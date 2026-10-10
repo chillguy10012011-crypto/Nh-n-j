@@ -1,0 +1,159 @@
+-- Tạo GUI chính
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+
+-- Khung 1: Nhập code (Input)
+local InputScroll = Instance.new("ScrollingFrame")
+local InputBox = Instance.new("TextBox")
+
+-- Khung 2: Hiển thị kết quả (Output)
+local OutputScroll = Instance.new("ScrollingFrame")
+local OutputBox = Instance.new("TextBox")
+
+-- Nút Run
+local RunButton = Instance.new("TextButton")
+
+-- Cấu hình ScreenGui
+ScreenGui.Name = "LuaDecoderGUI"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ResetOnSpawn = false
+
+-- Cấu hình MainFrame
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 450, 0, 400)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Cho phép kéo đi quanh màn hình
+
+-- Tiêu đề
+TitleLabel.Parent = MainFrame
+TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.Text = "Lua Deobfuscator & Unloader GUI"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 16
+
+-- Cấu hình Khung 1 (Input)
+InputScroll.Parent = MainFrame
+InputScroll.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputScroll.Position = UDim2.new(0.03, 0, 0.1, 0)
+InputScroll.Size = UDim2.new(0.94, 0, 0.35, 0)
+InputScroll.CanvasSize = UDim2.new(0, 0, 5, 0)
+InputScroll.ScrollBarThickness = 6
+
+InputBox.Parent = InputScroll
+InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InputBox.Size = UDim2.new(1, 0, 5, 0)
+InputBox.ClearTextOnFocus = false
+InputBox.MultiLine = true
+InputBox.Font = Enum.Font.Code
+InputBox.PlaceholderText = "Dán code cần bóc tách/giải mã vào đây..."
+InputBox.Text = ""
+InputBox.TextColor3 = Color3.fromRGB(200, 200, 200)
+InputBox.TextSize = 14
+InputBox.TextXAlignment = Enum.TextXAlignment.Left
+InputBox.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Nút Run
+RunButton.Parent = MainFrame
+RunButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+RunButton.Position = UDim2.new(0.3, 0, 0.48, 0)
+RunButton.Size = UDim2.new(0.4, 0, 0.08, 0)
+RunButton.Font = Enum.Font.SourceSansBold
+RunButton.Text = "RUN & DECODE"
+RunButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RunButton.TextSize = 16
+
+-- Cấu hình Khung 2 (Output)
+OutputScroll.Parent = MainFrame
+OutputScroll.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+OutputScroll.Position = UDim2.new(0.03, 0, 0.58, 0)
+OutputScroll.Size = UDim2.new(0.94, 0, 0.38, 0)
+OutputScroll.CanvasSize = UDim2.new(0, 0, 5, 0)
+OutputScroll.ScrollBarThickness = 6
+
+OutputBox.Parent = OutputScroll
+OutputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+OutputBox.Size = UDim2.new(1, 0, 5, 0)
+OutputBox.ClearTextOnFocus = false
+OutputBox.IsTextEditable = false -- Chỉ để đọc kết quả
+OutputBox.MultiLine = true
+OutputBox.Font = Enum.Font.Code
+OutputBox.PlaceholderText = "Kết quả sau khi giải mã sẽ hiện ở đây..."
+OutputBox.Text = ""
+OutputBox.TextColor3 = Color3.fromRGB(0, 255, 127)
+OutputBox.TextSize = 14
+OutputBox.TextXAlignment = Enum.TextXAlignment.Left
+OutputBox.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Hàm xử lý bóc tách và giải mã (Xử lý đa tầng loadstring & giải mã chuỗi)
+local function recursiveDecode(inputCode)
+	local currentCode = inputCode
+	local maxIterations = 10
+	local iteration = 0
+
+	-- Vòng lặp bóc tách nhiều tầng loadstring
+	while iteration < maxIterations do
+		iteration = iteration + 1
+		local decodedSomething = false
+
+		-- 1. Xử lý các dạng loadstring(game:HttpGet(...)) hoặc loadstring(string.dump(...)) hoặc các biến chứa mã hóa cơ bản
+		-- Bóc tách các dạng loadstring chứa chuỗi bên trong
+		local loadstringPattern = "loadstring%s*%(%s*(['\"])(.-)%1%s*%)"
+		local matchFound = string.match(currentCode, loadstringPattern)
+		if matchFound then
+			-- Nếu tìm thấy chuỗi thuần bên trong loadstring
+			currentCode = matchFound
+			decodedSomething = true
+		end
+
+		-- 2. Giải mã các chuỗi dạng thập phân/hex byte (ví dụ: \104\101\108\108\111 hoặc \x68\x65...)
+		-- Chuyển đổi các escape sequence dạng số thành ký tự thực
+		local successBytes, resultBytes = pcall(function()
+			return (currentCode:gsub("\\(%d%d%d)", function(digits)
+				return string.char(tonumber(digits))
+			end):gsub("\\x(%x%x)", function(hex)
+				return string.char(tonumber(hex, 16))
+			end))
+		end)
+		
+		if successBytes and resultBytes ~= currentCode then
+			currentCode = resultBytes
+			decodedSomething = true
+		end
+
+		-- 3. Giải mã các hàm giải mã chuỗi đơn giản thường gặp trong mã hóa cơ bản (như unescape/base64 tự chế nếu có)
+		-- (Phần này có thể mở rộng tùy thuộc vào cấu trúc obfuscator cụ thể mà bạn hay gặp)
+
+		-- Nếu sau một vòng lặp mà không có gì thay đổi nghĩa là đã bóc tách xong tầng cuối cùng
+		if not decodedSomething then
+			break
+		end
+	end
+
+	return currentCode
+end
+
+-- Sự kiện khi nhấn nút Run
+RunButton.MouseButton1Click:Connect(function()
+	local rawCode = InputBox.Text
+	if rawCode == "" then
+		OutputBox.Text = "-- Vui lòng nhập code vào Khung 1 trước!"
+		return
+	end
+
+	-- Thực hiện quá trình giải mã và bóc tách
+	local success, finalResult = pcall(function()
+		return recursiveDecode(rawCode)
+	end)
+
+	if success then
+		OutputBox.Text = finalResult
+	else
+		OutputBox.Text = "-- Lỗi trong quá trình bóc tách:\n" .. tostring(finalResult)
+	end
+end)
