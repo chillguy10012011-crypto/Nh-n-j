@@ -7,7 +7,7 @@
 	Điều khiển lõi khi đang chạy:
 	  - Mobile : cần điều khiển trái (di chuyển) + nút ▲ ▼ trong menu
 	  - PC     : WASD, Space = lên, Shift = xuống
-	  - Hất    : giữ nút "GIỮ ĐỂ HẤT" (mọi nền tảng) hoặc nhấp chuột (PC, bật trong menu)
+	  - Tự động: Lại gần người chơi trong phạm vi 15 studs, hệ thống sẽ tự động hất!
 ]]
 
 local Players      = game:GetService("Players")
@@ -26,23 +26,22 @@ pcall(function()
 end)
 
 ----------------------------------------------------------------------
--- CẤU HÌNH & TRẠNG THÁI (Đã tinh chỉnh để 1 chạm bay tít mù và hạn chế tự sát)
+-- CẤU HÌNH & TRẠNG THÁI
 ----------------------------------------------------------------------
 local CFG = {
-	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Giảm để không bị phản lực văng chết khi va chạm[span_0](start_span)[span_0](end_span)
-	AngularVel = Vector3.new(12000, 12000, -12000), -- Tăng tốc độ xoáy để hất đối thủ bay cực mạnh[span_1](start_span)[span_1](end_span)
-	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_2](start_span)"[span_2](end_span)
+	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Lực tuyến tính cố định[span_1](start_span)[span_1](end_span)
+	AngularVel = Vector3.new(12000, 12000, -12000), -- Lực xoáy cố định để hất bay mạnh[span_2](start_span)[span_2](end_span)
+	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_3](start_span)"[span_3](end_span)
 }
 
 local state = {
 	active      = false,
-	power       = 10,
 	speed       = 1,
 	up          = false,
 	down        = false,
-	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT[span_3](start_span)"[span_3](end_span)
-	mouseHeld   = false,                 -- chuột trái đang giữ[span_4](start_span)[span_4](end_span)
-	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_5](start_span)[span_5](end_span)
+	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT" dự phòng[span_4](start_span)[span_4](end_span)
+	mouseHeld   = false,                 -- chuột trái đang giữ[span_5](start_span)[span_5](end_span)
+	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_6](start_span)[span_6](end_span)
 }
 
 local allConns = {}
@@ -243,7 +242,7 @@ local mainBtn = button(body, "▶  BẮT ĐẦU", C.green, UDim2.new(1, 0, 0, 46
 mainBtn.TextSize = 15
 mainBtn.LayoutOrder = nextOrder()
 
--- thanh trượt
+-- thanh trượt tốc độ lõi
 local function makeSlider(title, min, max, default, suffix, onChange)
 	local holder = card(58)
 	new("TextLabel", {
@@ -319,10 +318,6 @@ local function makeSlider(title, min, max, default, suffix, onChange)
 	onChange(value)
 end
 
-makeSlider("Lực (Power)", 1, 100, state.power, "x", function(v)
-	state.power = v
-	if refreshUI then refreshUI() end
-end)
 makeSlider("Tốc độ lõi (Speed)", 1, 10, state.speed, "x", function(v)
 	state.speed = v
 	if refreshUI then refreshUI() end
@@ -355,7 +350,7 @@ local downBtn = button(vertRow, "▼  Xuống", C.panel2, UDim2.new(0.5, -4, 1, 
 makeHold(upBtn, C.panel2, C.accentA, function(v) state.up = v end)
 makeHold(downBtn, C.panel2, C.accentA, function(v) state.down = v end)
 
--- nút hất
+-- nút hất (dự phòng)
 local strikeBtn = button(body, "💥  GIỮ ĐỂ HẤT", C.amber, UDim2.new(1, 0, 0, 46))
 strikeBtn.TextSize = 15
 strikeBtn.LayoutOrder = nextOrder()
@@ -403,11 +398,11 @@ local hintCard = new("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
 	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Text = "Gợi ý: Tốc độ 1, Lực 2-4.\nDi chuyển lõi bằng cần điều khiển / WASD. Space hoặc ▲ = lên, Shift hoặc ▼ = xuống.\n"
-		.. "\"Xóa bẫy map\" chỉ dành cho game Simulator rơi xuống rãnh.",
+	Text = "Gợi ý: Tự động hất khi có người chơi lại gần trong bán kính 15 studs.\n"
+		.. "Di chuyển lõi bằng cần điều khiển / WASD. Space hoặc ▲ = lên, Shift hoặc ▼ = xuống.",
 }, body)
 ----------------------------------------------------------------------
--- LOGIC FLING
+-- LOGIC FLING & TỰ ĐỘNG BẮT MỤC TIÊU
 ----------------------------------------------------------------------
 local char, hum, hrp
 local fake, runConn, diedConn, ancConn
@@ -420,6 +415,26 @@ local function getChar()
 	hum = char:FindFirstChildOfClass("Humanoid")
 	hrp = char:FindFirstChild("HumanoidRootPart")
 	return hum ~= nil and hrp ~= nil
+end
+
+-- Hàm tìm người chơi gần nhất với khối cầu trong khoảng maxDist (15 studs) để tối ưu không gây lag
+local function getNearestPlayerPos(center, maxDist)
+	local nearestPos = nil
+	local minDist = maxDist
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+			local pHrp = p.Character:FindFirstChild("HumanoidRootPart")
+			if pHum and pHrp and pHum.Health > 0 then
+				local dist = (pHrp.Position - center).Magnitude
+				if dist < minDist then
+					minDist = dist
+					nearestPos = pHrp.Position
+				end
+			end
+		end
+	end
+	return nearestPos
 end
 
 local function aimPoint()
@@ -442,7 +457,7 @@ refreshUI = function()
 		mainBtn.Text = "■  DỪNG"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.red }):Play()
 		dot.BackgroundColor3 = C.green
-		statusLbl.Text = string.format("Đang chạy  •  Lực x%d  •  Tốc độ x%d", state.power, state.speed)
+		statusLbl.Text = string.format("Đang chạy (Auto 15s) • Tốc độ x%d", state.speed)
 	else
 		mainBtn.Text = "▶  BẮT ĐẦU"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.green }):Play()
@@ -510,36 +525,51 @@ start = function()
 			return
 		end
 
+		-- 1) Di chuyển lõi (cần điều khiển / WASD + nút lên xuống)
 		local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
 		local mv = hum.MoveDirection + Vector3.new(0, vert, 0)
 		if mv.Magnitude > 0 then
 			fake.CFrame = fake.CFrame + mv * (state.speed * CFG.SpeedUnit * dt)
 		end
 
+		-- 2) Luôn giữ nhân vật bám theo lõi ảo
 		hrp.CFrame = fake.CFrame
-		hrp.AssemblyLinearVelocity = CFG.LinearVel * state.power
+		hrp.AssemblyLinearVelocity = CFG.LinearVel
 
-		local target
-		if state.strikeHeld then
-			target = aimPoint()
-		elseif state.mouseHeld and state.strikeClick then
-			target = mouse.Hit.Position
+		-- 3) Tự động ưu tiên tìm người chơi gần nhất trong bán kính 15 studs quanh khối cầu
+		local target = nil
+		if fake then
+			target = getNearestPlayerPos(fake.Position, 15)
 		end
+
+		-- Nếu không có ai trong 15 studs, cho phép dùng nút hất thủ công dự phòng
+		if not target then
+			if state.strikeHeld then
+				target = aimPoint()
+			elseif state.mouseHeld and state.strikeClick then
+				target = mouse.Hit.Position
+			end
+		end
+
+		-- Nếu tìm thấy mục tiêu (tự động hoặc thủ công), tiến hành hất xoáy
 		if target then
 			hrp.CFrame = CFrame.new(target + Vector3.new(jitter(), jitter(), jitter()))
 				* CFrame.Angles(
 					math.rad(math.random(-180, 180)),
 					math.rad(math.random(-180, 180)),
 					math.rad(math.random(-180, 180)))
-			hrp.AssemblyAngularVelocity = CFG.AngularVel * state.power
+			hrp.AssemblyAngularVelocity = CFG.AngularVel
 		end
 
+		-- 4) Chống ngã
 		flip = not flip
 		hum:ChangeState(flip and Enum.HumanoidStateType.Swimming or Enum.HumanoidStateType.GettingUp)
 
+		-- 5) Camera bám lõi
 		local cam = Workspace.CurrentCamera
 		if cam and cam.CameraSubject ~= fake then cam.CameraSubject = fake end
 
+		-- 6) Màu cầu vồng cho lõi
 		hue = (hue + dt * 0.3) % 1
 		fake.Color = Color3.fromHSV(hue, 0.8, 1)
 	end)
