@@ -29,9 +29,9 @@ end)
 -- CẤU HÌNH & TRẠNG THÁI (Giữ nguyên hàm tăng vận tốc)
 ----------------------------------------------------------------------
 local CFG = {
-	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Hàm tăng vận tốc tuyến tính[span_1](start_span)[span_1](end_span)
-	AngularVel = Vector3.new(12000, 12000, -12000), -- Hàm tăng vận tốc góc (xoáy)[span_2](start_span)[span_2](end_span)
-	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_3](start_span)"[span_3](end_span)
+	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Hàm tăng vận tốc tuyến tính[span_0](start_span)[span_0](end_span)
+	AngularVel = Vector3.new(12000, 12000, -12000), -- Hàm tăng vận tốc góc (xoáy)[span_1](start_span)[span_1](end_span)
+	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_2](start_span)"[span_2](end_span)
 }
 
 local state = {
@@ -39,9 +39,9 @@ local state = {
 	speed       = 1,
 	up          = false,
 	down        = false,
-	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT" dự phòng[span_4](start_span)[span_4](end_span)
-	mouseHeld   = false,                 -- chuột trái đang giữ[span_5](start_span)[span_5](end_span)
-	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_6](start_span)[span_6](end_span)
+	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT" dự phòng[span_3](start_span)[span_3](end_span)
+	mouseHeld   = false,                 -- chuột trái đang giữ[span_4](start_span)[span_4](end_span)
+	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_5](start_span)[span_5](end_span)
 }
 
 local allConns = {}
@@ -398,16 +398,17 @@ local hintCard = new("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
 	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Text = "Gợi ý: Tự động ngồi lên người chơi trong bán kính 20 studs để fling.\n"
+	Text = "Gợi ý: Tự động tối ưu chuyển đổi trạng thái mượt mà khi ngồi lên người chơi trong 20 studs.\n"
 		.. "Di chuyển lõi bằng cần điều khiển / WASD. Space hoặc ▲ = lên, Shift hoặc ▼ = xuống.",
 }, body)
 ----------------------------------------------------------------------
--- LOGIC FLING & TỰ ĐỘNG NGỒI LÊN THÂN MỤC TIÊU (20 STUDS)
+-- LOGIC FLING & TỐI ƯU TRẠNG THÁI NGỒI/ĐỨNG
 ----------------------------------------------------------------------
 local char, hum, hrp
 local fake, runConn, diedConn, ancConn
 local flip = false
 local start, stop
+local wasSitting = false -- Biến cờ ghi nhớ trạng thái để tránh gọi lệnh liên tục gây lag
 
 local function getChar()
 	char = LocalPlayer.Character
@@ -457,7 +458,7 @@ refreshUI = function()
 		mainBtn.Text = "■  DỪNG"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.red }):Play()
 		dot.BackgroundColor3 = C.green
-		statusLbl.Text = string.format("Đang chạy (Sit 20s) • Tốc độ x%d", state.speed)
+		statusLbl.Text = string.format("Đang chạy (Optimized Sit) • Tốc độ x%d", state.speed)
 	else
 		mainBtn.Text = "▶  BẮT ĐẦU"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.green }):Play()
@@ -470,6 +471,7 @@ stop = function()
 	if not state.active then return end
 	state.active = false
 	state.strikeHeld, state.mouseHeld = false, false
+	wasSitting = false
 
 	if runConn then runConn:Disconnect() runConn = nil end
 	if diedConn then diedConn:Disconnect() diedConn = nil end
@@ -514,6 +516,7 @@ start = function()
 	end
 
 	state.active = true
+	wasSitting = false
 	fake = new("Part", {
 		Name = "FlingCore", Shape = Enum.PartType.Ball, Size = Vector3.new(4, 4, 4),
 		Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
@@ -542,28 +545,37 @@ start = function()
 		end
 
 		if nearestRoot then
-			-- TRƯỚC MẮT: Ngồi lên thân người chơi và giữ hàm tăng vận tốc (CFG.LinearVel & CFG.AngularVel)
+			-- CÓ MỤC TIÊU: Ngồi lên thân người chơi và áp dụng hàm tăng vận tốc
 			hrp.CFrame = nearestRoot.CFrame * CFrame.new(0, 1.5, 0) * CFrame.Angles(
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)))
 			
-			hrp.AssemblyLinearVelocity = CFG.LinearVel   -- Giữ nguyên hàm tăng vận tốc tuyến tính
-			hrp.AssemblyAngularVelocity = CFG.AngularVel -- Giữ nguyên hàm tăng vận tốc góc
+			hrp.AssemblyLinearVelocity = CFG.LinearVel   -- Giữ nguyên hàm tăng vận tốc tuyến tính[span_6](start_span)[span_6](end_span)
+			hrp.AssemblyAngularVelocity = CFG.AngularVel -- Giữ nguyên hàm tăng vận tốc góc[span_7](start_span)[span_7](end_span)
 			
-			pcall(function()
-				hum.Sit = true
-				hum:ChangeState(Enum.HumanoidStateType.Seated)
-			end)
+			-- Chỉ gọi lệnh đổi trạng thái ngồi NẾU trước đó chưa ngồi (tránh gọi liên tục gây lag)
+			if not wasSitting then
+				wasSitting = true
+				pcall(function()
+					hum.Sit = true
+					hum:ChangeState(Enum.HumanoidStateType.Seated)
+				end)
+			end
 		else
 			-- KHÔNG CÓ AI TRONG 20 STUDS: Quay về trạng thái bám lõi ảo bình thường
 			hrp.CFrame = fake.CFrame
 			hrp.AssemblyLinearVelocity = CFG.LinearVel
 			hrp.AssemblyAngularVelocity = Vector3.zero
-			pcall(function()
-				hum.Sit = false
-				hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-			end)
+			
+			-- Chỉ gọi lệnh đứng dậy NẾU trước đó đang ở trạng thái ngồi
+			if wasSitting then
+				wasSitting = false
+				pcall(function()
+					hum.Sit = false
+					hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+				end)
+			end
 
 			-- Hỗ trợ nút hất thủ công dự phòng nếu cần
 			local target = nil
