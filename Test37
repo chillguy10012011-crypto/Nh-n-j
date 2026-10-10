@@ -1,510 +1,176 @@
--- =========================================================================
--- BẪY DEOBFUSCATOR ULTIMATE PRO + GITHUB AUTO-SYNC (ĐÃ CẬP NHẬT TOKEN)
--- =========================================================================
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-local httpRequest = syn and syn.request or http and http.request or http_request or request
-
-local Clipboard = setclipboard or toclipboard or function(txt)
-    print("[Clipboard Fallback]: " .. txt)
-end
-
-if CoreGui:FindFirstChild("DefuscatorGUI") then
-    CoreGui["DefuscatorGUI"]:Destroy()
-end
-
+-- Tạo GUI chính
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DefuscatorGUI"
-ScreenGui.Parent = CoreGui
+local MainFrame = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+
+-- Khung 1: Nhập code cần giải mã
+local InputBox = Instance.new("TextBox")
+local InputLabel = Instance.new("TextLabel")
+
+-- Nút Run
+local RunButton = Instance.new("TextButton")
+
+-- Khung 2: Kết quả sau khi bóc tách & giải mã
+local OutputBox = Instance.new("TextBox")
+local OutputLabel = Instance.new("TextLabel")
+
+-- Cấu hình ScreenGui
+ScreenGui.Name = "ScriptDeobfuscatorGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 360, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -180, 0.5, -260)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
+-- Cấu hình MainFrame
+MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 450, 0, 420)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Kéo thả cửa sổ GUI
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
-Title.Font = Enum.Font.SourceSansBold
-Title.Text = " 📱 Bẫy Deobfuscator + GitHub Auto"
-Title.Parent = MainFrame
+-- Tiêu đề
+TitleLabel.Parent = MainFrame
+TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleLabel.Size = UDim2.new(0, 450, 0, 35)
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.Text = "Roblox Script Deobfuscator & Unloader"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 16
 
--- Khung chứa Ô nhập code & Nút Clear
-local InputContainer = Instance.new("Frame")
-InputContainer.Size = UDim2.new(1, -20, 0, 75)
-InputContainer.Position = UDim2.new(0, 10, 0, 40)
-InputContainer.BackgroundTransparency = 1
-InputContainer.Parent = MainFrame
+-- Label Khung 1
+InputLabel.Parent = MainFrame
+InputLabel.Position = UDim2.new(0, 15, 0, 45)
+InputLabel.Size = UDim2.new(0, 420, 0, 20)
+InputLabel.Font = Enum.Font.SourceSansBold
+InputLabel.Text = "Khung 1: Nhập code (Loadstring / Mã hóa)"
+InputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+InputLabel.TextSize = 14
+InputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-local InputBox = Instance.new("TextBox")
-InputBox.Size = UDim2.new(1, -55, 1, 0)
-InputBox.Position = UDim2.new(0, 0, 0, 0)
-InputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-InputBox.TextColor3 = Color3.fromRGB(200, 255, 200)
-InputBox.TextSize = 12
+-- TextBox Khung 1
+InputBox.Parent = MainFrame
+InputBox.Position = UDim2.new(0, 15, 0, 70)
+InputBox.Size = UDim2.new(0, 420, 0, 120)
+InputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+InputBox.BorderColor3 = Color3.fromRGB(60, 60, 60)
+InputBox.ClearTextOnFocus = false
 InputBox.Font = Enum.Font.Code
 InputBox.MultiLine = true
-InputBox.ClearTextOnFocus = false
-InputBox.PlaceholderText = "-- Dán code chứa link HttpGet vào đây..."
 InputBox.Text = ""
-InputBox.Parent = InputContainer
+InputBox.TextColor3 = Color3.fromRGB(0, 255, 128)
+InputBox.TextSize = 13
+InputBox.TextXAlignment = Enum.TextXAlignment.Left
+InputBox.TextYAlignment = Enum.TextYAlignment.Top
 
-local ClearBtn = Instance.new("TextButton")
-ClearBtn.Size = UDim2.new(0, 45, 1, 0)
-ClearBtn.Position = UDim2.new(1, -45, 0, 0)
-ClearBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ClearBtn.TextSize = 12
-ClearBtn.Font = Enum.Font.SourceSansBold
-ClearBtn.Text = "Clear"
-ClearBtn.Parent = InputContainer
+-- Nút Run
+RunButton.Parent = MainFrame
+RunButton.Position = UDim2.new(0, 15, 0, 200)
+RunButton.Size = UDim2.new(0, 420, 0, 35)
+RunButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+RunButton.Font = Enum.Font.SourceSansBold
+RunButton.Text = "RUN (Bóc tách & Giải mã)"
+RunButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RunButton.TextSize = 15
 
--- Thanh công cụ Mode, Cài đặt dòng & Nút GitHub
-local ToolBar = Instance.new("Frame")
-ToolBar.Size = UDim2.new(1, -20, 0, 30)
-ToolBar.Position = UDim2.new(0, 10, 0, 125)
-ToolBar.BackgroundTransparency = 1
-ToolBar.Parent = MainFrame
+-- Label Khung 2
+OutputLabel.Parent = MainFrame
+OutputLabel.Position = UDim2.new(0, 15, 0, 245)
+OutputLabel.Size = UDim2.new(0, 420, 0, 20)
+OutputLabel.Font = Enum.Font.SourceSansBold
+OutputLabel.Text = "Khung 2: Kết quả sạch sau khi xử lý"
+OutputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+OutputLabel.TextSize = 14
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-local ModeBtn = Instance.new("TextButton")
-ModeBtn.Size = UDim2.new(0, 110, 1, 0)
-ModeBtn.Position = UDim2.new(0, 0, 0, 0)
-ModeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-ModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ModeBtn.TextSize = 11
-ModeBtn.Font = Enum.Font.SourceSansBold
-ModeBtn.Text = "Mode: 🌐 Nhiều"
-ModeBtn.Parent = ToolBar
-
-local SettingsBtn = Instance.new("TextButton")
-SettingsBtn.Size = UDim2.new(0, 30, 1, 0)
-SettingsBtn.Position = UDim2.new(0, 115, 0, 0)
-SettingsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-SettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SettingsBtn.TextSize = 12
-SettingsBtn.Font = Enum.Font.SourceSansBold
-SettingsBtn.Text = "..."
-SettingsBtn.Parent = ToolBar
-
--- Nút Upload GitHub (Tự động đẩy code lên Repo của ní)
-local GitBtn = Instance.new("TextButton")
-GitBtn.Size = UDim2.new(0, 35, 1, 0)
-GitBtn.Position = UDim2.new(0, 150, 0, 0)
-GitBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 90)
-GitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-GitBtn.TextSize = 12
-GitBtn.Font = Enum.Font.SourceSansBold
-GitBtn.Text = "🐙"
-GitBtn.Parent = ToolBar
-
-local ExecButton = Instance.new("TextButton")
-ExecButton.Size = UDim2.new(1, -190, 1, 0)
-ExecButton.Position = UDim2.new(0, 190, 0, 0)
-ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
-ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ExecButton.TextSize = 12
-ExecButton.Font = Enum.Font.SourceSansBold
-ExecButton.Text = "⚡ BÓC TÁC"
-ExecButton.Parent = ToolBar
-
--- Thanh điều hướng trang & Nút Copy
-local NavFrame = Instance.new("Frame")
-NavFrame.Size = UDim2.new(1, -20, 0, 30)
-NavFrame.Position = UDim2.new(0, 10, 0, 160)
-NavFrame.BackgroundTransparency = 1
-NavFrame.Parent = MainFrame
-
-local PrevBtn = Instance.new("TextButton")
-PrevBtn.Size = UDim2.new(0, 70, 1, 0)
-PrevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PrevBtn.TextSize = 11
-PrevBtn.Font = Enum.Font.SourceSansBold
-PrevBtn.Text = "⬅️ Trước"
-PrevBtn.Parent = NavFrame
-
-local PageLabel = Instance.new("TextLabel")
-PageLabel.Size = UDim2.new(1, -220, 1, 0)
-PageLabel.Position = UDim2.new(0, 75, 0, 0)
-PageLabel.BackgroundTransparency = 1
-PageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-PageLabel.TextSize = 12
-PageLabel.Font = Enum.Font.SourceSansBold
-PageLabel.Text = "Trang: 0 / 0"
-PageLabel.TextXAlignment = Enum.TextXAlignment.Center
-PageLabel.Parent = NavFrame
-
-local CopyBtn = Instance.new("TextButton")
-CopyBtn.Size = UDim2.new(0, 65, 1, 0)
-CopyBtn.Position = UDim2.new(1, -145, 0, 0)
-CopyBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
-CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CopyBtn.TextSize = 11
-CopyBtn.Font = Enum.Font.SourceSansBold
-CopyBtn.Text = "📋 Copy"
-CopyBtn.Parent = NavFrame
-
-local NextBtn = Instance.new("TextButton")
-NextBtn.Size = UDim2.new(0, 70, 1, 0)
-NextBtn.Position = UDim2.new(1, -70, 0, 0)
-NextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-NextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-NextBtn.TextSize = 11
-NextBtn.Font = Enum.Font.SourceSansBold
-NextBtn.Text = "Sau ➡️"
-NextBtn.Parent = NavFrame
-
--- Khung hiển thị kết quả
-local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Size = UDim2.new(1, -20, 0, 290)
-ScrollingFrame.Position = UDim2.new(0, 10, 0, 200)
-ScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-ScrollingFrame.BorderSizePixel = 0
-ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ScrollingFrame.Parent = MainFrame
-
-local OutputBox = Instance.new("TextBox")
-OutputBox.Size = UDim2.new(1, 0, 0, 0)
-OutputBox.Position = UDim2.new(0, 0, 0, 0)
-OutputBox.BackgroundTransparency = 1
-OutputBox.TextColor3 = Color3.fromRGB(255, 220, 100)
-OutputBox.TextSize = 12
+-- TextBox Khung 2
+OutputBox.Parent = MainFrame
+OutputBox.Position = UDim2.new(0, 15, 0, 270)
+OutputBox.Size = UDim2.new(0, 420, 0, 130)
+OutputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+OutputBox.BorderColor3 = Color3.fromRGB(60, 60, 60)
+OutputBox.ClearTextOnFocus = false
 OutputBox.Font = Enum.Font.Code
 OutputBox.MultiLine = true
-OutputBox.ClearTextOnFocus = false
+OutputBox.ReadOnly = true
+OutputBox.Text = ""
+OutputBox.TextColor3 = Color3.fromRGB(255, 255, 0)
+OutputBox.TextSize = 13
 OutputBox.TextXAlignment = Enum.TextXAlignment.Left
 OutputBox.TextYAlignment = Enum.TextYAlignment.Top
-OutputBox.Text = "-- Kết quả sẽ hiện ở đây..."
-OutputBox.Parent = ScrollingFrame
 
--- Popup Cài đặt giới hạn số dòng
-local SettingsPopup = Instance.new("Frame")
-SettingsPopup.Size = UDim2.new(0, 240, 0, 140)
-SettingsPopup.Position = UDim2.new(0.5, -120, 0.5, -70)
-SettingsPopup.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-SettingsPopup.BorderSizePixel = 0
-SettingsPopup.Visible = false
-SettingsPopup.ZIndex = 5
-SettingsPopup.Parent = MainFrame
+-----------------------------------------------------------------
+-- HỆ THỐNG XỬ LÝ: BÓC TÁCH & GIẢI MÃ NHIỀU TẦNG
+-----------------------------------------------------------------
 
-local PopupTitle = Instance.new("TextLabel")
-PopupTitle.Size = UDim2.new(1, 0, 0, 30)
-PopupTitle.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-PopupTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-PopupTitle.TextSize = 13
-PopupTitle.Font = Enum.Font.SourceSansBold
-PopupTitle.Text = "⚙️ Cài đặt giới hạn số dòng"
-PopupTitle.ZIndex = 5
-PopupTitle.Parent = SettingsPopup
+local function decodePayload(text)
+	-- 1. Giải mã chuỗi string.char dạng ẩn (ví dụ: string.char(104,101,108,112))
+	text = text:gsub("string%.char%s*%(%s*([%d,%s]+)%s*%)", function(chars)
+		local decodedStr = ""
+		for num in chars:gmatch("%d+") do
+			decodedStr = decodedStr .. string.char(tonumber(num))
+		end
+		-- Trả về dạng chuỗi Lua đã bọc ngoặc kép an toàn
+		return string.format("%q", decodedStr)
+	end)
 
-local PopupDesc = Instance.new("TextLabel")
-PopupDesc.Size = UDim2.new(1, -10, 0, 25)
-PopupDesc.Position = UDim2.new(0, 5, 0, 35)
-PopupDesc.BackgroundTransparency = 1
-PopupDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
-PopupDesc.TextSize = 11
-PopupDesc.Font = Enum.Font.SourceSans
-PopupDesc.Text = "Nhập số dòng mỗi trang (Tối đa 10000):"
-PopupDesc.TextXAlignment = Enum.TextXAlignment.Left
-PopupDesc.ZIndex = 5
-PopupDesc.Parent = SettingsPopup
+	-- 2. Bóc tách các dạng loadstring nhiều tầng (Loadstring lồng nhau dạng: loadstring(game:HttpGet(...))() hoặc loadstring("...")())
+	local maxIterations = 10 -- Giới hạn chống lặp vô hạn
+	local iteration = 0
+	
+	local function unwrapLoadstring(str)
+		local changed = false
+		
+		-- Tìm dạng loadstring(...)(hoặc các biến gọi lại)
+		str = str:gsub("loadstring%s*%(%s*(['\"])(.-)%1%s*%)%s*%(%s*%)", function(_, innerCode)
+			changed = true
+			return innerCode
+		end)
+		
+		str = str:gsub("loadstring%s*%(%s*%[%[(.-)%]%s*%s*%)%s*%(%s*%)", function(innerCode)
+			changed = true
+			return innerCode
+		end)
 
-local LineInput = Instance.new("TextBox")
-LineInput.Size = UDim2.new(1, -20, 0, 30)
-LineInput.Position = UDim2.new(0, 10, 0, 65)
-LineInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-LineInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-LineInput.TextSize = 13
-LineInput.Font = Enum.Font.Code
-LineInput.Text = "500"
-LineInput.ZIndex = 5
-LineInput.Parent = SettingsPopup
+		-- Xử lý dạng game:HttpGet bọc trong loadstring
+		str = str:gsub("loadstring%s*%(%s*game\t*:%s*HttpGet%s*%(%s*(['\"])(.-)%1%s*%)%s*%)%s*%(%s*%)", function(_, url)
+			changed = true
+			-- Thử giả lập lấy nội dung nếu executor hỗ trợ, hoặc trả về dạng chú thích URL
+			local success, webContent = pcall(function()
+				return game:HttpGet(url)
+			end)
+			if success and webContent then
+				return webContent
+			end
+			return "-- [Không thể kết nối mạng tải từ URL: " .. url .. "]"
+		end)
 
-local SaveSettingsBtn = Instance.new("TextButton")
-SaveSettingsBtn.Size = UDim2.new(1, -20, 0, 28)
-SaveSettingsBtn.Position = UDim2.new(0, 10, 0, 102)
-SaveSettingsBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
-SaveSettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SaveSettingsBtn.TextSize = 12
-SaveSettingsBtn.Font = Enum.Font.SourceSansBold
-SaveSettingsBtn.Text = "Lưu & Đóng"
-SaveSettingsBtn.ZIndex = 5
-SaveSettingsBtn.Parent = SettingsPopup
+		return str, changed
+	end
 
-SettingsBtn.MouseButton1Click:Connect(function()
-    SettingsPopup.Visible = not SettingsPopup.Visible
-end)
+	repeat
+		iteration = iteration + 1
+		local changed
+		text, changed = unwrapLoadstring(text)
+	until not changed or iteration >= maxIterations
 
-SaveSettingsBtn.MouseButton1Click:Connect(function()
-    local val = tonumber(LineInput.Text)
-    if val then
-        if val > 10000 then LineInput.Text = "10000" end
-        if val < 10 then LineInput.Text = "10" end
-    else
-        LineInput.Text = "500"
-    end
-    SettingsPopup.Visible = false
-end)
-
-ClearBtn.MouseButton1Click:Connect(function()
-    InputBox.Text = ""
-end)
-
-CopyBtn.MouseButton1Click:Connect(function()
-    local textToCopy = OutputBox.Text
-    if textToCopy and textToCopy ~= "-- Kết quả sẽ hiện ở đây..." then
-        Clipboard(textToCopy)
-        CopyBtn.Text = "✅ Copied!"
-        task.delay(1.5, function()
-            CopyBtn.Text = "📋 Copy"
-        end)
-    end
-end)
-
--- =========================================================================
--- LOGIC GITHUB API (TOKEN MỚI)
--- =========================================================================
-local GITHUB_TOKEN = "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"
-local GITHUB_REPO = "Chillguy10012011-crypto/Script"
-
-GitBtn.MouseButton1Click:Connect(function()
-    if not httpRequest then
-        OutputBox.Text = "❌ Lỗi: Executor không hỗ trợ httpRequest() để gọi GitHub API!"
-        return
-    end
-
-    local fullText = table.concat(rawCapturedLogs or {}, "\n")
-    if fullText == "" or fullText == "-- Kết quả sẽ hiện ở đây..." then
-        OutputBox.Text = "⚠️ Chưa có code nào được bóc tách để đẩy lên GitHub!"
-        return
-    end
-
-    OutputBox.Text = "🐙 Đang đẩy toàn bộ code lên GitHub..."
-
-    local fileName = "Deobfuscated_" .. os.time() .. ".lua"
-    local url = string.format("https://api.github.com/repos/%s/contents/%s", GITHUB_REPO, fileName)
-    
-    local success, response = pcall(function()
-        return httpRequest({
-            Url = url,
-            Method = "PUT",
-            Headers = {
-                ["Authorization"] = "Bearer " .. GITHUB_TOKEN,
-                ["Content-Type"] = "application/json",
-                ["User-Agent"] = "Roblox-Deobfuscator"
-            },
-            Body = HttpService:JSONEncode({
-                message = "Auto-upload deobfuscated script via Mobile GUI",
-                content = crypt and crypt.base64encode(fullText) or HttpService:Base64Encode(fullText)
-            })
-        })
-    end)
-
-    if success and response and (response.StatusCode == 201 or response.StatusCode == 200) then
-        OutputBox.Text = string.format("✅ Đẩy lên GitHub thành công!\n📁 Repo: %s\n📄 File: %s", GITHUB_REPO, fileName)
-    else
-        local errInfo = (response and response.Body) or "Lỗi kết nối"
-        OutputBox.Text = "❌ Đẩy lên GitHub thất bại:\n" .. tostring(errInfo)
-    end
-end)
-
--- =========================================================================
--- LOGIC QUẢN LÝ MODE & HIỂN THỊ TRANG
--- =========================================================================
-local currentMode = 2
-rawCapturedLogs = {}
-local pages = {}
-local currentPage = 1
-
-ModeBtn.MouseButton1Click:Connect(function()
-    if currentMode == 2 then
-        currentMode = 1
-        ModeBtn.Text = "Mode: 📄 Một"
-        NavFrame.Visible = false
-        ScrollingFrame.Size = UDim2.new(1, -20, 0, 320)
-        ScrollingFrame.Position = UDim2.new(0, 10, 0, 170)
-    else
-        currentMode = 2
-        ModeBtn.Text = "Mode: 🌐 Nhiều"
-        NavFrame.Visible = true
-        ScrollingFrame.Size = UDim2.new(1, -20, 0, 290)
-        ScrollingFrame.Position = UDim2.new(0, 10, 0, 200)
-    end
-    updateDisplay()
-end)
-
-function updateDisplay()
-    if #rawCapturedLogs == 0 then
-        PageLabel.Text = "Trang: 0 / 0"
-        OutputBox.Text = "-- Không có dữ liệu."
-        OutputBox.Size = UDim2.new(1, 0, 0, 0)
-        return
-    end
-
-    local fullText = table.concat(rawCapturedLogs, "\n")
-
-    if currentMode == 1 then
-        PageLabel.Text = "Mode: Một Trang"
-        OutputBox.Text = fullText
-        local lines = 1
-        for _ in fullText:gmatch("\n") do lines = lines + 1 end
-        OutputBox.Size = UDim2.new(1, 0, 0, math.max(320, lines * 15 + 20))
-    else
-        local maxLinesPerTrang = tonumber(LineInput.Text) or 500
-        pages = {}
-        
-        local currentChunkLines = {}
-        local lineCount = 0
-        
-        for line in (fullText .. "\n"):gmatch("(.-)\n") do
-            table.insert(currentChunkLines, line)
-            lineCount = lineCount + 1
-            if lineCount >= maxLinesPerTrang then
-                table.insert(pages, table.concat(currentChunkLines, "\n"))
-                currentChunkLines = {}
-                lineCount = 0
-            end
-        end
-        if #currentChunkLines > 0 then
-            table.insert(pages, table.concat(currentChunkLines, "\n"))
-        end
-
-        if currentPage < 1 then currentPage = 1 end
-        if currentPage > #pages then currentPage = #pages end
-        
-        PageLabel.Text = string.format("Trang: %d / %d", currentPage, #pages)
-        local pageText = pages[currentPage] or ""
-        OutputBox.Text = pageText
-        
-        local lines = 1
-        for _ in pageText:gmatch("\n") do lines = lines + 1 end
-        OutputBox.Size = UDim2.new(1, 0, 0, math.max(290, lines * 15 + 20))
-    end
+	return text
 end
 
-PrevBtn.MouseButton1Click:Connect(function()
-    if currentMode == 2 and currentPage > 1 then
-        currentPage = currentPage - 1
-        updateDisplay()
-    end
-end)
+-- Sự kiện khi nhấn nút Run
+RunButton.MouseButton1Click:Connect(function()
+	local rawInput = InputBox.Text
+	if rawInput == "" then
+		OutputBox.Text = "-- Vui lòng nhập code vào Khung 1!"
+		return
+	end
 
-NextBtn.MouseButton1Click:Connect(function()
-    if currentMode == 2 and currentPage < #pages then
-        currentPage = currentPage + 1
-        updateDisplay()
-    end
-end)
+	local success, result = pcall(function()
+		return decodePayload(rawInput)
+	end)
 
--- =========================================================================
--- LOGIC BẪY BÓC TÁC ĐA TẦNG & HTTPGET
--- =========================================================================
-ExecButton.MouseButton1Click:Connect(function()
-    local rawCode = InputBox.Text
-    if rawCode == "" then
-        OutputBox.Text = "⚠️ Lỗi: Vui lòng nhập code!"
-        return
-    end
-
-    OutputBox.Text = "⏳ Đang bóc tách dữ liệu..."
-    rawCapturedLogs = {}
-    pages = {}
-    currentPage = 1
-
-    local old_loadstring = loadstring
-    local loadCount = 0
-
-    local interceptedHttpGet = function(self, url)
-        loadCount = loadCount + 1
-        local header = string.format("\n\n-- [HTTPGET #%d]: %s\n", loadCount, tostring(url))
-        
-        local success, fileContent = pcall(function()
-            return game:HttpGet(url)
-        end)
-        
-        if success then
-            table.insert(rawCapturedLogs, header .. fileContent)
-            updateDisplay()
-            return fileContent
-        else
-            table.insert(rawCapturedLogs, header .. "-- [LỖI TẢI LINK]")
-            updateDisplay()
-            return ""
-        end
-    end
-
-    local function recursiveTrap(codeChunk, chunkName)
-        loadCount = loadCount + 1
-        local header = string.format("\n\n-- [LOADSTRING #%d] - Chunk: %s\n", loadCount, tostring(chunkName))
-        table.insert(rawCapturedLogs, header .. tostring(codeChunk))
-        updateDisplay()
-        
-        local realFunc, loadErr = old_loadstring(codeChunk, chunkName)
-        if realFunc then
-            local envProxy
-            envProxy = setmetatable({
-                loadstring = function(subChunk, subName)
-                    return recursiveTrap(subChunk, subName)
-                end,
-                game = setmetatable({
-                    HttpGet = function(s, u)
-                        return interceptedHttpGet(s, u)
-                    end
-                }, {
-                    __index = game
-                })
-            }, {
-                __index = getgenv(),
-            })
-            
-            setfenv(realFunc, envProxy)
-            pcall(realFunc)
-            return realFunc
-        else
-            return function() end
-        end
-    end
-
-    getgenv().loadstring = function(codeChunk, chunkName)
-        return recursiveTrap(codeChunk, chunkName)
-    end
-
-    local envProxyTop = setmetatable({
-        game = setmetatable({
-            HttpGet = function(s, u)
-                return interceptedHttpGet(s, u)
-            end
-        }, {
-            __index = game
-        })
-    }, {
-        __index = getgenv(),
-    })
-
-    local success, err = pcall(function()
-        local func, loadErr = old_loadstring(rawCode)
-        if func then
-            setfenv(func, envProxyTop)
-            func()
-        else
-            OutputBox.Text = "❌ Lỗi cú pháp ban đầu:\n" .. tostring(loadErr)
-        end
-    end)
-
-    getgenv().loadstring = old_loadstring
-
-    if not success and #rawCapturedLogs == 0 then
-        OutputBox.Text = "⚠️ Lỗi thực thi:\n" .. tostring(err)
-    elseif #rawCapturedLogs > 0 then
-        updateDisplay()
-    end
+	if success then
+		OutputBox.Text = result
+	else
+		OutputBox.Text = "-- Lỗi khi xử lý giải mã:\n" .. tostring(result)
+	end
 end)
