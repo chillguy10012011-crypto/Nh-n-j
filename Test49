@@ -1,0 +1,623 @@
+--[[
+	FLING HUB  -  GUI tự viết, KHÔNG tải gì từ bên ngoài
+	(không HttpGet, không loadstring, không Rayfield, không asset ngoài)
+
+	Logic fling dựa trên "Fling Fixed V2" (danyad22 / catt0q), viết lại hoàn toàn.
+
+	Điều khiển lõi khi đang chạy:
+	  - Mobile : cần điều khiển trái (di chuyển) + nút ▲ ▼ trong menu
+	  - PC     : WASD, Space = lên, Shift = xuống
+	  - Hất    : giữ nút "GIỮ ĐỂ HẤT" (mọi nền tảng) hoặc nhấp chuột (PC, bật trong menu)
+]]
+
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local UIS          = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace    = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local mouse = LocalPlayer:GetMouse()
+
+-- dọn bản cũ nếu chạy lại script
+pcall(function()
+	local env = getgenv()
+	if env.__FlingHubCleanup then env.__FlingHubCleanup() end
+end)
+
+----------------------------------------------------------------------
+-- CẤU HÌNH & TRẠNG THÁI (Đã tinh chỉnh để 1 chạm bay tít mù và hạn chế tự sát)
+----------------------------------------------------------------------
+local CFG = {
+	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Giảm để không bị phản lực văng chết khi va chạm[span_0](start_span)[span_0](end_span)
+	AngularVel = Vector3.new(12000, 12000, -12000), -- Tăng tốc độ xoáy để hất đối thủ bay cực mạnh[span_1](start_span)[span_1](end_span)
+	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_2](start_span)"[span_2](end_span)
+}
+
+local state = {
+	active      = false,
+	power       = 10,
+	speed       = 1,
+	up          = false,
+	down        = false,
+	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT[span_3](start_span)"[span_3](end_span)
+	mouseHeld   = false,                 -- chuột trái đang giữ[span_4](start_span)[span_4](end_span)
+	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_5](start_span)[span_5](end_span)
+}
+
+local allConns = {}
+local function bind(signal, fn)
+	local c = signal:Connect(fn)
+	table.insert(allConns, c)
+	return c
+end
+
+----------------------------------------------------------------------
+-- GIAO DIỆN: tiện ích
+----------------------------------------------------------------------
+local C = {
+	bg      = Color3.fromRGB(16, 16, 22),
+	panel   = Color3.fromRGB(26, 26, 36),
+	panel2  = Color3.fromRGB(40, 40, 56),
+	text    = Color3.fromRGB(235, 235, 245),
+	sub     = Color3.fromRGB(150, 150, 172),
+	accentA = Color3.fromRGB(124, 92, 255),
+	accentB = Color3.fromRGB(0, 200, 255),
+	green   = Color3.fromRGB(46, 204, 113),
+	red     = Color3.fromRGB(235, 77, 94),
+	amber   = Color3.fromRGB(250, 160, 50),
+	white   = Color3.new(1, 1, 1),
+}
+
+local function new(class, props, parent)
+	local o = Instance.new(class)
+	for k, v in pairs(props) do o[k] = v end
+	if parent then o.Parent = parent end
+	return o
+end
+
+local function corner(o, r)
+	return new("UICorner", { CornerRadius = UDim.new(0, r) }, o)
+end
+
+local function stroke(o, color, thickness)
+	return new("UIStroke", {
+		Color = color, Thickness = thickness or 1,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, o)
+end
+
+local function gradient(o, a, b, rot)
+	return new("UIGradient", { Color = ColorSequence.new(a, b), Rotation = rot or 0 }, o)
+end
+
+local order = 0
+local function nextOrder()
+	order = order + 1
+	return order
+end
+
+----------------------------------------------------------------------
+-- GIAO DIỆN: cửa sổ
+----------------------------------------------------------------------
+local gui = new("ScreenGui", {
+	Name = "FlingHub", ResetOnSpawn = false, IgnoreGuiInset = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999,
+})
+local okParent = pcall(function()
+	local ok, h = pcall(function() return gethui and gethui() end)
+	if ok and h then
+		gui.Parent = h
+	else
+		gui.Parent = game:GetService("CoreGui")
+	end
+end)
+if not okParent or not gui.Parent then
+	gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local TITLE_H = 42
+local cam0 = Workspace.CurrentCamera
+local vpY = cam0 and cam0.ViewportSize.Y or 600
+local BODY_H = math.clamp(vpY - 140, 200, 430)
+local WIN_W = 290
+
+local win = new("Frame", {
+	Name = "Window",
+	Size = UDim2.new(0, WIN_W, 0, TITLE_H + BODY_H),
+	Position = UDim2.new(0, 16, 0, math.max(10, (vpY - (TITLE_H + BODY_H)) / 2)),
+	BackgroundColor3 = C.bg, BorderSizePixel = 0, ClipsDescendants = true,
+}, gui)
+corner(win, 14)
+stroke(win, C.panel2, 1.5)
+
+-- thanh tiêu đề
+local titleBar = new("Frame", {
+	Size = UDim2.new(1, 0, 0, TITLE_H), BackgroundColor3 = C.panel, BorderSizePixel = 0,
+}, win)
+
+local accentLine = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = C.white, BorderSizePixel = 0,
+}, titleBar)
+gradient(accentLine, C.accentA, C.accentB, 0)
+
+local titleLbl = new("TextLabel", {
+	BackgroundTransparency = 1, Position = UDim2.new(0, 14, 0, 2), Size = UDim2.new(1, -100, 1, -2),
+	Font = Enum.Font.GothamBlack, TextSize = 17, TextColor3 = C.white,
+	TextXAlignment = Enum.TextXAlignment.Left, Text = "⚡ FLING HUB",
+}, titleBar)
+gradient(titleLbl, C.accentA, C.accentB, 0)
+
+local minBtn = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -44, 0.5, 1), Size = UDim2.new(0, 28, 0, 28),
+	BackgroundColor3 = C.panel2, AutoButtonColor = false, Font = Enum.Font.GothamBold,
+	TextSize = 16, TextColor3 = C.text, Text = "–",
+}, titleBar)
+corner(minBtn, 8)
+
+local closeBtn = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 1), Size = UDim2.new(0, 28, 0, 28),
+	BackgroundColor3 = C.panel2, AutoButtonColor = false, Font = Enum.Font.GothamBold,
+	TextSize = 13, TextColor3 = C.red, Text = "✕",
+}, titleBar)
+corner(closeBtn, 8)
+
+-- kéo cửa sổ bằng thanh tiêu đề (chuột + cảm ứng)
+do
+	local tracked, dragStart, startPos
+	titleBar.InputBegan:Connect(function(input)
+		local t = input.UserInputType
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			tracked, dragStart, startPos = input, input.Position, win.Position
+		end
+	end)
+	bind(UIS.InputChanged, function(input)
+		if tracked and (input.UserInputType == Enum.UserInputType.MouseMovement or input == tracked) then
+			local d = input.Position - dragStart
+			win.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+				startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+	bind(UIS.InputEnded, function(input)
+		if tracked and (input == tracked or input.UserInputType == Enum.UserInputType.MouseButton1) then
+			tracked = nil
+		end
+	end)
+end
+
+-- phần thân (cuộn được, hợp màn hình điện thoại)
+local body = new("ScrollingFrame", {
+	Position = UDim2.new(0, 0, 0, TITLE_H), Size = UDim2.new(1, 0, 0, BODY_H),
+	BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+	ScrollBarImageColor3 = C.accentA, CanvasSize = UDim2.new(0, 0, 0, 0),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y,
+}, win)
+new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) }, body)
+new("UIPadding", {
+	PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12),
+	PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 14),
+}, body)
+
+local function card(h)
+	local f = new("Frame", {
+		Size = UDim2.new(1, 0, 0, h), BackgroundColor3 = C.panel, BorderSizePixel = 0,
+		LayoutOrder = nextOrder(),
+	}, body)
+	corner(f, 10)
+	return f
+end
+
+local function row(h)
+	return new("Frame", {
+		Size = UDim2.new(1, 0, 0, h), BackgroundTransparency = 1, LayoutOrder = nextOrder(),
+	}, body)
+end
+
+local function button(parent, text, color, size, pos)
+	local b = new("TextButton", {
+		Size = size, Position = pos or UDim2.new(0, 0, 0, 0), BackgroundColor3 = color,
+		AutoButtonColor = false, Font = Enum.Font.GothamBold, TextSize = 13,
+		TextColor3 = C.white, Text = text,
+	}, parent)
+	corner(b, 10)
+	return b
+end
+
+local refreshUI -- khai báo trước, gán ở dưới
+
+-- thẻ trạng thái
+local statusCard = card(34)
+local dot = new("Frame", {
+	Size = UDim2.new(0, 10, 0, 10), Position = UDim2.new(0, 12, 0.5, -5),
+	BackgroundColor3 = C.red, BorderSizePixel = 0,
+}, statusCard)
+corner(dot, 5)
+local statusLbl = new("TextLabel", {
+	BackgroundTransparency = 1, Position = UDim2.new(0, 30, 0, 0), Size = UDim2.new(1, -38, 1, 0),
+	Font = Enum.Font.GothamMedium, TextSize = 12, TextColor3 = C.text,
+	TextXAlignment = Enum.TextXAlignment.Left, Text = "Đang tắt",
+}, statusCard)
+
+-- nút bật / tắt chính
+local mainBtn = button(body, "▶  BẮT ĐẦU", C.green, UDim2.new(1, 0, 0, 46))
+mainBtn.TextSize = 15
+mainBtn.LayoutOrder = nextOrder()
+
+-- thanh trượt
+local function makeSlider(title, min, max, default, suffix, onChange)
+	local holder = card(58)
+	new("TextLabel", {
+		BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(0.6, 0, 0, 18),
+		Font = Enum.Font.GothamMedium, TextSize = 13, TextColor3 = C.text,
+		TextXAlignment = Enum.TextXAlignment.Left, Text = title,
+	}, holder)
+	local valLbl = new("TextLabel", {
+		BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 6),
+		Size = UDim2.new(0.4, 0, 0, 18), Font = Enum.Font.GothamBold, TextSize = 13,
+		TextColor3 = C.accentB, TextXAlignment = Enum.TextXAlignment.Right, Text = "",
+	}, holder)
+	local hit = new("TextButton", {
+		Text = "", AutoButtonColor = false, BackgroundTransparency = 1,
+		Position = UDim2.new(0, 14, 0, 28), Size = UDim2.new(1, -28, 0, 24),
+	}, holder)
+	local bar = new("Frame", {
+		AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
+		Size = UDim2.new(1, 0, 0, 6), BackgroundColor3 = C.panel2, BorderSizePixel = 0,
+	}, hit)
+	corner(bar, 3)
+	local fill = new("Frame", {
+		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = C.white, BorderSizePixel = 0,
+	}, bar)
+	corner(fill, 3)
+	gradient(fill, C.accentA, C.accentB, 0)
+	local knob = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
+		Size = UDim2.new(0, 16, 0, 16), BackgroundColor3 = C.white, BorderSizePixel = 0, ZIndex = 2,
+	}, bar)
+	corner(knob, 8)
+	stroke(knob, C.accentA, 2)
+
+	local value = default
+	local function render()
+		local a = (value - min) / (max - min)
+		fill.Size = UDim2.new(a, 0, 1, 0)
+		knob.Position = UDim2.new(a, 0, 0.5, 0)
+		valLbl.Text = tostring(value) .. suffix
+	end
+	local function setFromX(x)
+		local a = math.clamp((x - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
+		local v = math.floor(min + a * (max - min) + 0.5)
+		if v ~= value then
+			value = v
+			render()
+			onChange(value)
+		end
+	end
+
+	local dragging, dragInput = false, nil
+	hit.InputBegan:Connect(function(input)
+		local t = input.UserInputType
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			dragging, dragInput = true, input
+			body.ScrollingEnabled = false
+			setFromX(input.Position.X)
+		end
+	end)
+	bind(UIS.InputChanged, function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input == dragInput) then
+			setFromX(input.Position.X)
+		end
+	end)
+	bind(UIS.InputEnded, function(input)
+		if dragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1) then
+			dragging, dragInput = false, nil
+			body.ScrollingEnabled = true
+		end
+	end)
+
+	render()
+	onChange(value)
+end
+
+makeSlider("Lực (Power)", 1, 100, state.power, "x", function(v)
+	state.power = v
+	if refreshUI then refreshUI() end
+end)
+makeSlider("Tốc độ lõi (Speed)", 1, 10, state.speed, "x", function(v)
+	state.speed = v
+	if refreshUI then refreshUI() end
+end)
+
+-- nút giữ (hold)
+local function makeHold(btn, base, lit, setter)
+	local tracked
+	btn.InputBegan:Connect(function(input)
+		local t = input.UserInputType
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			tracked = input
+			btn.BackgroundColor3 = lit
+			setter(true)
+		end
+	end)
+	bind(UIS.InputEnded, function(input)
+		if tracked and (input == tracked or input.UserInputType == Enum.UserInputType.MouseButton1) then
+			tracked = nil
+			btn.BackgroundColor3 = base
+			setter(false)
+		end
+	end)
+end
+
+-- lên / xuống
+local vertRow = row(38)
+local upBtn = button(vertRow, "▲  Lên", C.panel2, UDim2.new(0.5, -4, 1, 0), UDim2.new(0, 0, 0, 0))
+local downBtn = button(vertRow, "▼  Xuống", C.panel2, UDim2.new(0.5, -4, 1, 0), UDim2.new(0.5, 4, 0, 0))
+makeHold(upBtn, C.panel2, C.accentA, function(v) state.up = v end)
+makeHold(downBtn, C.panel2, C.accentA, function(v) state.down = v end)
+
+-- nút hất
+local strikeBtn = button(body, "💥  GIỮ ĐỂ HẤT", C.amber, UDim2.new(1, 0, 0, 46))
+strikeBtn.TextSize = 15
+strikeBtn.LayoutOrder = nextOrder()
+makeHold(strikeBtn, C.amber, Color3.fromRGB(255, 205, 90), function(v) state.strikeHeld = v end)
+
+-- công tắc hất bằng click
+local togCard = card(38)
+new("TextLabel", {
+	BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -70, 1, 0),
+	Font = Enum.Font.GothamMedium, TextSize = 13, TextColor3 = C.text,
+	TextXAlignment = Enum.TextXAlignment.Left, Text = "Nhấp chuột để hất (PC)",
+}, togCard)
+local sw = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.new(0, 44, 0, 22),
+	Text = "", AutoButtonColor = false, BackgroundColor3 = C.panel2,
+}, togCard)
+corner(sw, 11)
+local swKnob = new("Frame", {
+	Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(0, 3, 0.5, -8),
+	BackgroundColor3 = C.white, BorderSizePixel = 0,
+}, sw)
+corner(swKnob, 8)
+local function renderSwitch()
+	local info = TweenInfo.new(0.15)
+	TweenService:Create(sw, info, {
+		BackgroundColor3 = state.strikeClick and C.accentA or C.panel2,
+	}):Play()
+	TweenService:Create(swKnob, info, {
+		Position = state.strikeClick and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
+	}):Play()
+end
+sw.Activated:Connect(function()
+	state.strikeClick = not state.strikeClick
+	renderSwitch()
+end)
+renderSwitch()
+
+-- tiện ích
+local utilRow = row(36)
+local resetBtn = button(utilRow, "☠  Reset", C.red, UDim2.new(0.5, -4, 1, 0), UDim2.new(0, 0, 0, 0))
+local clearBtn = button(utilRow, "🧹 Xóa bẫy map", C.panel2, UDim2.new(0.5, -4, 1, 0), UDim2.new(0.5, 4, 0, 0))
+
+-- gợi ý
+local hintCard = new("TextLabel", {
+	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
+	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
+	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+	Text = "Gợi ý: Tốc độ 1, Lực 2-4.\nDi chuyển lõi bằng cần điều khiển / WASD. Space hoặc ▲ = lên, Shift hoặc ▼ = xuống.\n"
+		.. "\"Xóa bẫy map\" chỉ dành cho game Simulator rơi xuống rãnh.",
+}, body)
+----------------------------------------------------------------------
+-- LOGIC FLING
+----------------------------------------------------------------------
+local char, hum, hrp
+local fake, runConn, diedConn, ancConn
+local flip = false
+local start, stop
+
+local function getChar()
+	char = LocalPlayer.Character
+	if not char then return false end
+	hum = char:FindFirstChildOfClass("Humanoid")
+	hrp = char:FindFirstChild("HumanoidRootPart")
+	return hum ~= nil and hrp ~= nil
+end
+
+local function aimPoint()
+	local cam = Workspace.CurrentCamera
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { char, fake }
+	local origin, look = cam.CFrame.Position, cam.CFrame.LookVector
+	local res = Workspace:Raycast(origin, look * 2000, params)
+	return res and res.Position or (origin + look * 150)
+end
+
+local function jitter()
+	return (math.random() - 0.5) * 0.5
+end
+
+refreshUI = function()
+	local info = TweenInfo.new(0.15)
+	if state.active then
+		mainBtn.Text = "■  DỪNG"
+		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.red }):Play()
+		dot.BackgroundColor3 = C.green
+		statusLbl.Text = string.format("Đang chạy  •  Lực x%d  •  Tốc độ x%d", state.power, state.speed)
+	else
+		mainBtn.Text = "▶  BẮT ĐẦU"
+		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.green }):Play()
+		dot.BackgroundColor3 = C.red
+		statusLbl.Text = "Đang tắt"
+	end
+end
+
+stop = function()
+	if not state.active then return end
+	state.active = false
+	state.strikeHeld, state.mouseHeld = false, false
+
+	if runConn then runConn:Disconnect() runConn = nil end
+	if diedConn then diedConn:Disconnect() diedConn = nil end
+	if ancConn then ancConn:Disconnect() ancConn = nil end
+
+	if hrp and hrp.Parent then
+		if fake then pcall(function() hrp.CFrame = CFrame.new(fake.Position) end) end
+		
+		hrp.AssemblyLinearVelocity = Vector3.zero
+		hrp.AssemblyAngularVelocity = Vector3.zero
+		
+		task.spawn(function()
+			local startTime = tick()
+			while tick() - startTime < 1 do
+				if hrp and hrp.Parent then
+					hrp.AssemblyLinearVelocity = Vector3.zero
+					hrp.AssemblyAngularVelocity = Vector3.zero
+				end
+				task.wait()
+			end
+		end)
+	end
+	if fake then fake:Destroy() fake = nil end
+
+	local cam = Workspace.CurrentCamera
+	if cam and hum and hum.Parent then cam.CameraSubject = hum end
+	if hum and hum.Parent and hum.Health > 0 then
+		pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+	end
+	refreshUI()
+end
+
+start = function()
+	if state.active then return end
+	if not getChar() or hum.Health <= 0 then
+		statusLbl.Text = "Chưa có nhân vật"
+		dot.BackgroundColor3 = C.amber
+		return
+	end
+
+	state.active = true
+	fake = new("Part", {
+		Name = "FlingCore", Shape = Enum.PartType.Ball, Size = Vector3.new(4, 4, 4),
+		Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
+		Material = Enum.Material.Neon, Transparency = 0.4, Color = C.accentA,
+		CFrame = hrp.CFrame,
+	}, Workspace)
+
+	local hue = 0
+	runConn = RunService.Heartbeat:Connect(function(dt)
+		if not (char and char.Parent and hrp and hrp.Parent and hum and hum.Parent and hum.Health > 0) then
+			stop()
+			return
+		end
+
+		local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
+		local mv = hum.MoveDirection + Vector3.new(0, vert, 0)
+		if mv.Magnitude > 0 then
+			fake.CFrame = fake.CFrame + mv * (state.speed * CFG.SpeedUnit * dt)
+		end
+
+		hrp.CFrame = fake.CFrame
+		hrp.AssemblyLinearVelocity = CFG.LinearVel * state.power
+
+		local target
+		if state.strikeHeld then
+			target = aimPoint()
+		elseif state.mouseHeld and state.strikeClick then
+			target = mouse.Hit.Position
+		end
+		if target then
+			hrp.CFrame = CFrame.new(target + Vector3.new(jitter(), jitter(), jitter()))
+				* CFrame.Angles(
+					math.rad(math.random(-180, 180)),
+					math.rad(math.random(-180, 180)),
+					math.rad(math.random(-180, 180)))
+			hrp.AssemblyAngularVelocity = CFG.AngularVel * state.power
+		end
+
+		flip = not flip
+		hum:ChangeState(flip and Enum.HumanoidStateType.Swimming or Enum.HumanoidStateType.GettingUp)
+
+		local cam = Workspace.CurrentCamera
+		if cam and cam.CameraSubject ~= fake then cam.CameraSubject = fake end
+
+		hue = (hue + dt * 0.3) % 1
+		fake.Color = Color3.fromHSV(hue, 0.8, 1)
+	end)
+
+	diedConn = hum.Died:Connect(function() stop() end)
+	ancConn = char.AncestryChanged:Connect(function(_, parent)
+		if not parent then stop() end
+	end)
+	refreshUI()
+end
+
+----------------------------------------------------------------------
+-- NỐI SỰ KIỆN
+----------------------------------------------------------------------
+bind(UIS.InputBegan, function(input, gpe)
+	if UIS:GetFocusedTextBox() then return end
+	if input.KeyCode == Enum.KeyCode.Space then
+		state.up = true
+	elseif input.KeyCode == Enum.KeyCode.LeftShift then
+		state.down = true
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and not gpe then
+		state.mouseHeld = true
+	end
+end)
+bind(UIS.InputEnded, function(input)
+	if input.KeyCode == Enum.KeyCode.Space then
+		state.up = false
+	elseif input.KeyCode == Enum.KeyCode.LeftShift then
+		state.down = false
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+		state.mouseHeld = false
+	end
+end)
+
+mainBtn.Activated:Connect(function()
+	if state.active then stop() else start() end
+end)
+
+resetBtn.Activated:Connect(function()
+	stop()
+	local c = LocalPlayer.Character
+	if c then
+		local h = c:FindFirstChildOfClass("Humanoid")
+		if h then h.Health = 0 end
+		pcall(function() c:BreakJoints() end)
+	end
+end)
+
+clearBtn.Activated:Connect(function()
+	local removed = 0
+	for _, name in ipairs({ "PoisonParts", "KillParts", "RagdollParts", "WaterParts", "FireParts" }) do
+		local o = Workspace:FindFirstChild(name)
+		if o then o:Destroy() removed = removed + 1 end
+	end
+	clearBtn.Text = removed > 0 and ("✓ Đã xóa " .. removed) or "Không có gì để xóa"
+	task.delay(2, function()
+		if clearBtn.Parent then clearBtn.Text = "🧹 Xóa bẫy map" end
+	end)
+end)
+
+local minimized = false
+minBtn.Activated:Connect(function()
+	minimized = not minimized
+	body.Visible = not minimized
+	minBtn.Text = minimized and "+" or "–"
+	TweenService:Create(win, TweenInfo.new(0.2), {
+		Size = UDim2.new(0, WIN_W, 0, minimized and TITLE_H or (TITLE_H + BODY_H)),
+	}):Play()
+end)
+
+local function cleanup()
+	pcall(stop)
+	for _, c in ipairs(allConns) do
+		pcall(function() c:Disconnect() end)
+	end
+	gui:Destroy()
+end
+closeBtn.Activated:Connect(cleanup)
+
+pcall(function() getgenv().__FlingHubCleanup = cleanup end)
+refreshUI()
