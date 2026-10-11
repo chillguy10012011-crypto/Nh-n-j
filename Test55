@@ -24,9 +24,9 @@ end)
 -- CẤU HÌNH & TRẠNG THÁI
 ----------------------------------------------------------------------
 local CFG = {
-	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Hàm tăng vận tốc tuyến tính[span_0](start_span)[span_0](end_span)
-	AngularVel = Vector3.new(12000, 12000, -12000), -- Hàm tăng vận tốc góc (xoáy)[span_1](start_span)[span_1](end_span)
-	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_2](start_span)"[span_2](end_span)
+	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Hàm tăng vận tốc tuyến tính[span_1](start_span)[span_1](end_span)
+	AngularVel = Vector3.new(12000, 12000, -12000), -- Hàm tăng vận tốc góc (xoáy)[span_2](start_span)[span_2](end_span)
+	SpeedUnit  = 50, -- studs/giây cho mỗi mức "Tốc độ[span_3](start_span)"[span_3](end_span)
 }
 
 local state = {
@@ -35,9 +35,9 @@ local state = {
 	targetMode  = 2, -- 1: Đầu (Head), 2: Thân (Torso), 3: Chân (Legs)
 	up          = false,
 	down        = false,
-	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT" dự phòng[span_3](start_span)[span_3](end_span)
-	mouseHeld   = false,                 -- chuột trái đang giữ[span_4](start_span)[span_4](end_span)
-	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_5](start_span)[span_5](end_span)
+	strikeHeld  = false,                 -- nút "GIỮ ĐỂ HẤT" dự phòng[span_4](start_span)[span_4](end_span)
+	mouseHeld   = false,                 -- chuột trái đang giữ[span_5](start_span)[span_5](end_span)
+	strikeClick = not UIS.TouchEnabled,  -- bật hất bằng click (mặc định chỉ PC)[span_6](start_span)[span_6](end_span)
 }
 
 local allConns = {}
@@ -445,17 +445,18 @@ local hintCard = new("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
 	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Text = "Gợi ý: Tích hợp hiệu ứng biến thiên động giúp fling thành công tức thì.\n"
+	Text = "Gợi ý: Tự động luân phiên dịch chuyển trước/sau mục tiêu trong 0.5 studs khi ngồi.\n"
 		.. "Di chuyển lõi bằng cần điều khiển / WASD. Space hoặc ▲ = lên, Shift hoặc ▼ = xuống.",
 }, body)
 ----------------------------------------------------------------------
--- LOGIC FLING & BIẾN THIÊN ĐỘNG (MICRO-MOTION)
+-- LOGIC FLING & DỊCH CHUYỂN LUÂN PHIÊN TRƯỚC/SAU
 ----------------------------------------------------------------------
 local char, hum, hrp
 local fake, runConn, diedConn, ancConn
 local flip = false
 local start, stop
 local wasSitting = false
+local toggleSide = false -- Biến chuyển đổi luân phiên giữa trước và sau
 
 local function getChar()
 	char = LocalPlayer.Character
@@ -514,7 +515,7 @@ refreshUI = function()
 		mainBtn.Text = "■  DỪNG"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.red }):Play()
 		dot.BackgroundColor3 = C.green
-		statusLbl.Text = string.format("Đang chạy (Mode %d + Motion) • x%d", state.targetMode, state.speed)
+		statusLbl.Text = string.format("Đang chạy (Mode %d + Alternating) • x%d", state.targetMode, state.speed)
 	else
 		mainBtn.Text = "▶  BẮT ĐẦU"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.green }):Play()
@@ -581,6 +582,8 @@ start = function()
 	}, Workspace)
 
 	local hue = 0
+	local frameCounter = 0 -- Đếm khung hình để gửi lệnh luân phiên đều đặn, tránh nghẽn lệnh
+
 	runConn = RunService.Heartbeat:Connect(function(dt)
 		if not (char and char.Parent and hrp and hrp.Parent and hum and hum.Parent and hum.Health > 0) then
 			stop()
@@ -601,21 +604,25 @@ start = function()
 		end
 
 		if targetPart then
-			-- TẠO NHỊP BIẾN THIÊN (GIẢ LẬP HIỆN TƯỢNG ĐỘNG ĐỂ SERVER ĐỒNG BỘ LỰC TỨC THÌ)
-			local microOffset = Vector3.new(
-				math.sin(tick() * 30) * 0.5, 
-				math.cos(tick() * 30) * 0.5, 
-				math.sin(tick() * 20) * 0.5
-			)
+			-- Cập nhật trạng thái luân phiên mỗi 10 khung hình (~đều đặn khoảng 6 lần/giây) giúp lệnh gửi đi ổn định không bị nghẽn
+			frameCounter = frameCounter + 1
+			if frameCounter >= 10 then
+				frameCounter = 0
+				toggleSide = not toggleSide
+			end
 
-			-- Gắn kết lên phần cơ thể đã chọn kèm độ dịch chuyển biến thiên liên tục
-			hrp.CFrame = targetPart.CFrame * CFrame.new(microOffset) * CFrame.Angles(
+			-- Khoảng cách dịch chuyển 0.5 studs ra trước hoặc ra sau dựa trên hướng nhìn của mục tiêu
+			local offsetDist = toggleSide and 0.5 or -0.5
+			local offsetCF = targetPart.CFrame * CFrame.new(0, 0, offsetDist)
+
+			-- Gắn kết lên vị trí luân phiên trước/sau 0.5 studs kèm góc quay ngẫu nhiên
+			hrp.CFrame = offsetCF * CFrame.Angles(
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)))
 			
-			hrp.AssemblyLinearVelocity = CFG.LinearVel   -- Lực tuyến tính ép liên tục[span_6](start_span)[span_6](end_span)
-			hrp.AssemblyAngularVelocity = CFG.AngularVel -- Lực xoáy cực mạnh[span_7](start_span)[span_7](end_span)
+			hrp.AssemblyLinearVelocity = CFG.LinearVel   -- Hàm tăng vận tốc tuyến tính[span_7](start_span)[span_7](end_span)
+			hrp.AssemblyAngularVelocity = CFG.AngularVel -- Hàm tăng vận tốc góc[span_8](start_span)[span_8](end_span)
 			
 			if not wasSitting then
 				wasSitting = true
@@ -710,7 +717,8 @@ end)
 
 clearBtn.Activated:Connect(function()
 	local removed = 0
-	for _, name in ipairs({ "PoisonParts", "KillParts", "RagdollParts", "WaterParts", "FireParts" }) do
+	local okParts = { "PoisonParts", "KillParts", "RagdollParts", "WaterParts", "FireParts" }
+	for _, name in ipairs(okParts) do
 		local o = Workspace:FindFirstChild(name)
 		if o then o:Destroy() removed = removed + 1 end
 	end
