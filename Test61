@@ -1,8 +1,8 @@
 --[[
-	ACCESSORY FLING HUB (FIXED VELOCITY)
-	- Tháo khớp & bật va chạm cho phụ kiện.
-	- Khóa nhân vật gốc, camera bám khối cầu.
-	- Bổ sung hàm tăng vận tốc tuyến tính và góc cực đại cho phụ kiện.
+	ACCESSORY FLING HUB (MULTI-ACCESSORY + MEGA SIZE)
+	- Lấy toàn bộ phụ kiện (mũ, tóc,...).
+	- Tăng kích thước Handle để mở rộng vùng quét fling.
+	- Phá Weld, bật CanCollide, truyền vận tốc cực đại.
 ]]
 
 local Players      = game:GetService("Players")
@@ -20,12 +20,13 @@ pcall(function()
 end)
 
 ----------------------------------------------------------------------
--- CẤU HÌNH & TRẠNG THÁI (Hàm tăng vận tốc cực đại)
+-- CẤU HÌNH & TRẠNG THÁI
 ----------------------------------------------------------------------
 local CFG = {
 	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Lực đẩy tuyến tính cực mạnh
 	AngularVel = Vector3.new(12000, 12000, -12000), -- Lực xoáy góc cực mạnh
 	SpeedUnit  = 50,
+	SizeMultiplier = 2.0, -- Tăng kích thước phụ kiện lên gấp đôi để mở rộng hitbox
 }
 
 local state = {
@@ -372,11 +373,11 @@ new("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
 	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Text = "Gợi ý: Đã kích hoạt hàm tăng vận tốc cực đại trực tiếp vào phụ kiện fling.\n"
-		.. "Lại gần mục tiêu trong 20 studs để quét và hất văng lập tức.",
+	Text = "Gợi ý: Lấy toàn bộ phụ kiện (mũ, tóc,...), nhân bản kích thước lớn để quét fling tối đa.\n"
+		.. "Khóa nhân vật gốc an toàn, camera bám khối cầu điều khiển.",
 }, body)
 ----------------------------------------------------------------------
--- LOGIC TRUYỀN VẬN TỐC CỰC ĐẠI CHO PHỤ KIỆN & FLING
+-- LOGIC ĐA PHỤ KIỆN (MULTI-ACCESSORY) + MEGA SIZE + FLING
 ----------------------------------------------------------------------
 local char, hum, hrp
 local fake, runConn, diedConn, ancConn
@@ -392,8 +393,10 @@ local function getChar()
 	return hum ~= nil and hrp ~= nil
 end
 
-local function prepareAccessoryHandle()
-	if not char then return nil end
+-- Lấy danh sách TOÀN BỘ Handle phụ kiện (mũ, tóc, kính,...), phá weld, bật va chạm và tăng kích thước
+local function getAllAccessoryHandles()
+	local handles = {}
+	if not char then return handles end
 	for _, child in ipairs(char:GetChildren()) do
 		if child:IsA("Accessory") then
 			local handle = child:FindFirstChild("Handle")
@@ -409,11 +412,19 @@ local function prepareAccessoryHandle()
 					end
 				end
 				handle.CanCollide = true
-				return handle
+				-- Tăng kích thước phụ kiện để mở rộng vùng va chạm fling
+				if not handle:FindFirstChild("OriginalSize") then
+					local origSize = Instance.new("Vector3Value")
+					origSize.Name = "OriginalSize"
+					origSize.Value = handle.Size
+					origSize.Parent = handle
+					handle.Size = handle.Size * CFG.SizeMultiplier
+				end
+				table.insert(handles, handle)
 			end
 		end
 	end
-	return nil
+	return handles
 end
 
 local function getNearestTargetPart(center, maxDist, mode)
@@ -450,7 +461,7 @@ refreshUI = function()
 		mainBtn.Text = "■  DỪNG"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.red }):Play()
 		dot.BackgroundColor3 = C.green
-		statusLbl.Text = string.format("Acc-Fling Active (Mode %d) • x%d", state.targetMode, state.speed)
+		statusLbl.Text = string.format("Mega Acc-Fling (Mode %d) • x%d", state.targetMode, state.speed)
 	else
 		mainBtn.Text = "▶  BẮT ĐẦU"
 		TweenService:Create(mainBtn, info, { BackgroundColor3 = C.green }):Play()
@@ -469,10 +480,13 @@ stop = function()
 	if ancConn then ancConn:Disconnect() ancConn = nil end
 
 	pcall(function()
-		local accHandle = prepareAccessoryHandle()
-		if accHandle and accHandle.Parent then
-			accHandle.AssemblyLinearVelocity = Vector3.zero
-			accHandle.AssemblyAngularVelocity = Vector3.zero
+		for _, handle in ipairs(getAllAccessoryHandles()) do
+			if handle and handle.Parent then
+				handle.AssemblyLinearVelocity = Vector3.zero
+				handle.AssemblyAngularVelocity = Vector3.zero
+				local orig = handle:FindFirstChild("OriginalSize")
+				if orig then handle.Size = orig.Value end
+			end
 		end
 	end)
 
@@ -497,8 +511,8 @@ start = function()
 		return
 	end
 
-	local accHandle = prepareAccessoryHandle()
-	if not accHandle then
+	local handles = getAllAccessoryHandles()
+	if #handles == 0 then
 		statusLbl.Text = "Không tìm thấy Phụ kiện (Accessory)"
 		dot.BackgroundColor3 = C.amber
 		return
@@ -515,13 +529,10 @@ start = function()
 	}, Workspace)
 
 	runConn = RunService.Heartbeat:Connect(function(dt)
-		if not (char and char.Parent and hrp and hrp.Parent and hum and hum.Parent and hum.Health > 0 and accHandle and accHandle.Parent) then
+		if not (char and char.Parent and hrp and hrp.Parent and hum and hum.Parent and hum.Health > 0) then
 			stop()
 			return
 		end
-
-		-- Duy trì va chạm vật lý cho phụ kiện
-		accHandle.CanCollide = true
 
 		-- 1) Di chuyển khối cầu lõi bằng phím/joystick
 		local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
@@ -536,31 +547,39 @@ start = function()
 			targetPart = getNearestTargetPart(fake.Position, 20, state.targetMode)
 		end
 
-		if targetPart then
-			-- Luân phiên vị trí trước/sau 0.5 studs để tránh nghẽn lệnh mạng
-			frameCounter = frameCounter + 1
-			if frameCounter >= 10 then
-				frameCounter = 0
-				toggleSide = not toggleSide
-			end
+		-- Luân phiên vị trí trước/sau 0.5 studs để tránh nghẽn lệnh mạng
+		frameCounter = frameCounter + 1
+		if frameCounter >= 10 then
+			frameCounter = 0
+			toggleSide = not toggleSide
+		end
 
+		if targetPart then
 			local offsetDist = toggleSide and 0.5 or -0.5
 			local offsetCF = targetPart.CFrame * CFrame.new(0, 0, offsetDist)
 
-			-- Dịch chuyển Handle phụ kiện tới đối thủ
-			accHandle.CFrame = offsetCF * CFrame.Angles(
-				math.rad(math.random(-180, 180)),
-				math.rad(math.random(-180, 180)),
-				math.rad(math.random(-180, 180)))
-			
-			-- KÍCH HOẠT HÀM TĂNG VẬN TỐC TUYẾN TÍNH VÀ GÓC CỰC ĐẠI CHO PHỤ KIỆN
-			accHandle.AssemblyLinearVelocity = CFG.LinearVel
-			accHandle.AssemblyAngularVelocity = CFG.AngularVel
+			for _, handle in ipairs(handles) do
+				if handle and handle.Parent then
+					handle.CanCollide = true
+					handle.CFrame = offsetCF * CFrame.Angles(
+						math.rad(math.random(-180, 180)),
+						math.rad(math.random(-180, 180)),
+						math.rad(math.random(-180, 180)))
+					
+					handle.AssemblyLinearVelocity = CFG.LinearVel
+					handle.AssemblyAngularVelocity = CFG.AngularVel
+				end
+			end
 		else
-			-- KHÔNG CÓ AI TRONG 20 STUDS: Phụ kiện bám theo khối cầu ảo đang di chuyển
-			accHandle.CFrame = fake.CFrame
-			accHandle.AssemblyLinearVelocity = Vector3.zero
-			accHandle.AssemblyAngularVelocity = Vector3.zero
+			-- KHÔNG CÓ AI TRONG 20 STUDS: Các phụ kiện bám theo khối cầu ảo
+			for _, handle in ipairs(handles) do
+				if handle and handle.Parent then
+					handle.CanCollide = true
+					handle.CFrame = fake.CFrame
+					handle.AssemblyLinearVelocity = Vector3.zero
+					handle.AssemblyAngularVelocity = Vector3.zero
+				end
+			end
 		end
 
 		-- 3) Chuyển camera bám theo khối cầu điều khiển
