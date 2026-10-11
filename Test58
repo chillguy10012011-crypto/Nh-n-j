@@ -1,6 +1,10 @@
 --[[
-	ACCESSORY FLING HUB  -  GUI tự viết, KHÔNG tải gì từ bên ngoài
-	Sử dụng phần Handle của Phụ kiện (Accessory) làm tâm fling để bảo vệ nhân vật.
+	ACCESSORY FLING HUB (FIXED WELD & COLLISION)
+	
+	Nguyên lý: 
+	1. Phá bỏ khớp nối (Weld) giữa Handle phụ kiện và cơ thể.
+	2. Ép CanCollide = true cho Handle để tạo lực va chạm.
+	3. Ép lực góc/tuyến tính cực đại vào Handle và dịch chuyển luân phiên 0.5 stud quanh mục tiêu.
 ]]
 
 local Players      = game:GetService("Players")
@@ -370,11 +374,11 @@ new("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
 	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Text = "Gợi ý: Dùng phần Handle của Phụ kiện (Accessory) làm công cụ fling.\n"
-		.. "Nhân vật được giữ nguyên an toàn, phụ kiện sẽ quét quanh mục tiêu để hất văng.",
+	Text = "Gợi ý: Script đã thêm tính năng phá Weld và mở CanCollide cho Handle phụ kiện.\n"
+		.. "Nhân vật đứng yên an toàn, phụ kiện tách rời tự động fling mục tiêu.",
 }, body)
 ----------------------------------------------------------------------
--- LOGIC PHỤ KIỆN (ACCESSORY HANDLE) FLING
+-- LOGIC PHỤ KIỆN (ACCESSORY HANDLE) FLING + THÁO KHỚP & VA CHẠM
 ----------------------------------------------------------------------
 local char, hum, hrp
 local fake, runConn, diedConn, ancConn
@@ -390,13 +394,28 @@ local function getChar()
 	return hum ~= nil and hrp ~= nil
 end
 
--- Hàm lấy phần Handle của Accessory đầu tiên tìm thấy trên nhân vật
-local function getAccessoryHandle()
+-- Lấy Handle phụ kiện & tiến hành XÓA KHỚP WELD + BẬT VA CHẠM
+local function prepareAccessoryHandle()
 	if not char then return nil end
 	for _, child in ipairs(char:GetChildren()) do
 		if child:IsA("Accessory") then
 			local handle = child:FindFirstChild("Handle")
 			if handle and handle:IsA("BasePart") then
+				-- 1. Xóa toàn bộ khớp nối (Weld, WeldConstraint, Motor6D, JointInstance) đính Handle với cơ thể
+				for _, joint in ipairs(handle:GetChildren()) do
+					if joint:IsA("JointInstance") or joint:IsA("WeldConstraint") then
+						joint:Destroy()
+					end
+				end
+				for _, joint in ipairs(char:GetDescendants()) do
+					if (joint:IsA("JointInstance") or joint:IsA("WeldConstraint")) and (joint.Part0 == handle or joint.Part1 == handle) then
+						joint:Destroy()
+					end
+				end
+
+				-- 2. Bật va chạm vật lý cho Handle để tạo lực fling
+				handle.CanCollide = true
+				
 				return handle
 			end
 		end
@@ -456,13 +475,15 @@ stop = function()
 	if diedConn then diedConn:Disconnect() diedConn = nil end
 	if ancConn then ancConn:Disconnect() ancConn = nil end
 
-	local accHandle = getAccessoryHandle()
-	if accHandle and accHandle.Parent then
-		accHandle.AssemblyLinearVelocity = Vector3.zero
-		accHandle.AssemblyAngularVelocity = Vector3.zero
-	end
-	if fake then fake:Destroy() fake = nil end
+	pcall(function()
+		local accHandle = prepareAccessoryHandle()
+		if accHandle and accHandle.Parent then
+			accHandle.AssemblyLinearVelocity = Vector3.zero
+			accHandle.AssemblyAngularVelocity = Vector3.zero
+		end
+	end)
 
+	if fake then fake:Destroy() fake = nil end
 	refreshUI()
 end
 
@@ -474,7 +495,8 @@ start = function()
 		return
 	end
 
-	local accHandle = getAccessoryHandle()
+	-- Chuẩn bị Handle phụ kiện (Đã phá Weld & Bật CanCollide)
+	local accHandle = prepareAccessoryHandle()
 	if not accHandle then
 		statusLbl.Text = "Không tìm thấy Phụ kiện (Accessory)"
 		dot.BackgroundColor3 = C.amber
@@ -494,6 +516,9 @@ start = function()
 			stop()
 			return
 		end
+
+		-- Duy trì bật CanCollide liên tục cho Handle (đề phòng game tự ngắt)
+		accHandle.CanCollide = true
 
 		-- 1) Di chuyển khối cầu lõi bằng phím/joystick
 		local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
@@ -521,7 +546,7 @@ start = function()
 			local offsetDist = toggleSide and 0.5 or -0.5
 			local offsetCF = targetPart.CFrame * CFrame.new(0, 0, offsetDist)
 
-			-- Ép phần phụ kiện (Accessory Handle) bay đến mục tiêu và xoay cực mạnh
+			-- Dịch chuyển Handle phụ kiện tách rời tới đối thủ và áp dụng lực cực đại
 			accHandle.CFrame = offsetCF * CFrame.Angles(
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)),
