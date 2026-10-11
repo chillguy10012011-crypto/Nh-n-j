@@ -1,0 +1,198 @@
+-- [[ FE HAT SPHERE FLING & FLY CAM GUI (R6) ]]
+-- Lưu ý: Cần mặc ít nhất 1-2 phụ kiện (Hat/Accessory) trên Avatar Roblox trước khi dùng.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Đảm bảo Game là R6
+if Humanoid.RigType ~= Enum.HumanoidRigType.R6 then
+    warn("Script này tối ưu nhất cho R6!")
+end
+
+local Active = false
+local ControlPart = nil
+local Connections = {}
+local MoveSpeed = 50
+
+-- UI Creation
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HatSphereFlingGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = (gethui and gethui()) or LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0.05, 0, 0.4, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner", Frame)
+UICorner.CornerRadius = UDim2.new(0, 8)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "Hat Sphere Fling"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleBtn.Text = "BẬT SPHERE FLING"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = Frame
+
+local BtnCorner = Instance.new("UICorner", ToggleBtn)
+BtnCorner.CornerRadius = UDim2.new(0, 6)
+
+-- Hàm Bật/Tắt Network Ownership (Netless)
+local function ClaimNet(part)
+    if sethiddenproperty then
+        sethiddenproperty(LocalPlayer, "MaximumSimulationRadius", 1000)
+        sethiddenproperty(LocalPlayer, "SimulationRadius", 1000)
+    end
+    part.Velocity = Vector3.new(25, 0, 0)
+end
+
+-- Kích hoạt chế độ Sphere Fly & Hat Fling
+local function EnableFlingSphere()
+    Character = LocalPlayer.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+
+    -- 1. Tạo Khối Cầu Điều Khiển (Control Sphere)
+    ControlPart = Instance.new("Part")
+    ControlPart.Name = "ControlSphere"
+    ControlPart.Shape = Enum.PartType.Ball
+    ControlPart.Size = Vector3.new(3, 3, 3)
+    ControlPart.Material = Enum.Material.Neon
+    ControlPart.Color = Color3.fromRGB(0, 255, 200)
+    ControlPart.Transparency = 0.3 -- Đổi thành 1 nếu muốn tàng hình
+    ControlPart.CanCollide = false
+    ControlPart.Anchored = true
+    ControlPart.CFrame = RootPart.CFrame * CFrame.new(0, 5, 0)
+    ControlPart.Parent = Workspace
+
+    -- Camera đi theo Khối Cầu
+    Camera.CameraSubject = ControlPart
+
+    -- 2. Gom các Phụ kiện (Hat/Accessory)
+    local Hats = {}
+    for _, child in pairs(Character:GetChildren()) do
+        if child:IsA("Accessory") and child:FindFirstChild("Handle") then
+            local handle = child.Handle
+            handle.Massless = true
+            handle.CanCollide = true
+            
+            -- Xóa Weld gốc liên kết với đầu/thân
+            for _, weld in pairs(handle:GetDescendants()) do
+                if weld:IsA("Weld") or weld:IsA("Motor6D") or weld:IsA("WeldConstraint") then
+                    weld:Destroy()
+                end
+            end
+            table.insert(Hats, handle)
+        end
+    end
+
+    if #Hats == 0 then
+        warn("Không tìm thấy phụ kiện mũ nào trên Avatar!")
+    end
+
+    -- 3. Vòng lặp điều khiển di chuyển Khối Cầu (PC WASD / Mobile Joystick)
+    Connections["Move"] = RunService.RenderStepped:Connect(function(dt)
+        if not ControlPart then return end
+        
+        local moveDir = Vector3.new()
+        
+        -- Hướng nhìn của Camera
+        local camCFrame = Camera.CFrame
+        local lookVector = camCFrame.LookVector
+        local rightVector = camCFrame.RightVector
+
+        -- Hỗ trợ phím PC
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + lookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - lookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - rightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + rightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+        -- Hỗ trợ Joystick di chuyển trên Điện thoại Mobile
+        local humMoveDir = Humanoid.MoveDirection
+        if humMoveDir.Magnitude > 0 then
+            moveDir = (camCFrame:VectorToWorldSpace(Vector3.new(humMoveDir.X, 0, humMoveDir.Z))).Unit
+        end
+
+        if moveDir.Magnitude > 0 then
+            ControlPart.CFrame = ControlPart.CFrame + (moveDir.Unit * MoveSpeed * dt)
+        end
+    end)
+
+    -- 4. Vòng lặp ép Phụ kiện đi theo Cầu + Gán Vận Tốc Fling Cực Đại
+    Connections["HatFling"] = RunService.Heartbeat:Connect(function()
+        if not ControlPart then return end
+
+        for i, handle in ipairs(Hats) do
+            ClaimNet(handle)
+            
+            -- Phân bổ vị trí phụ kiện xoay quanh khối cầu
+            local angle = (tick() * 10) + (i * (math.pi * 2 / #Hats))
+            local offset = Vector3.new(math.cos(angle) * 2, math.sin(angle) * 2, 0)
+            
+            -- Ép CFrame phụ kiện bám sát Khối Cầu
+            handle.CFrame = ControlPart.CFrame * CFrame.new(offset) * CFrame.Angles(math.rad(math.random(0, 360)), math.rad(math.random(0, 360)), 0)
+            
+            -- Gán Vận Tốc Siêu Cao (Velocity / RotVelocity Fling)
+            handle.Velocity = Vector3.new(99999, 99999, 99999)
+            handle.RotVelocity = Vector3.new(math.huge, math.huge, math.huge)
+        end
+    end)
+end
+
+-- Tắt chế độ & Trả lại Camera
+local function DisableFlingSphere()
+    for _, conn in pairs(Connections) do
+        conn:Disconnect()
+    end
+    Connections = {}
+
+    if ControlPart then
+        ControlPart:Destroy()
+        ControlPart = nil
+    end
+
+    if Character and Character:FindFirstChild("Humanoid") then
+        Camera.CameraSubject = Character.Humanoid
+    end
+end
+
+-- Sự kiện bấm nút GUI
+ToggleBtn.MouseButton1Click:Connect(function()
+    Active = not Active
+    if Active then
+        ToggleBtn.Text = "TẮT SPHERE FLING"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        EnableFlingSphere()
+    else
+        ToggleBtn.Text = "BẬT SPHERE FLING"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        DisableFlingSphere()
+    end
+end)
