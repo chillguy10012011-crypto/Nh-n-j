@@ -1,8 +1,8 @@
 --[[
-	ACCESSORY FLING HUB (FULL FIXED)
-	- Phá Weld & Bật CanCollide cho Accessory Handle.
-	- Khóa chuyển động nhân vật gốc.
-	- Chuyển camera bám theo khối cầu điều khiển.
+	ACCESSORY FLING HUB (FIXED VELOCITY)
+	- Tháo khớp & bật va chạm cho phụ kiện.
+	- Khóa nhân vật gốc, camera bám khối cầu.
+	- Bổ sung hàm tăng vận tốc tuyến tính và góc cực đại cho phụ kiện.
 ]]
 
 local Players      = game:GetService("Players")
@@ -20,11 +20,11 @@ pcall(function()
 end)
 
 ----------------------------------------------------------------------
--- CẤU HÌNH & TRẠNG THÁI
+-- CẤU HÌNH & TRẠNG THÁI (Hàm tăng vận tốc cực đại)
 ----------------------------------------------------------------------
 local CFG = {
-	LinearVel  = Vector3.new(7000, 8000, 7000),
-	AngularVel = Vector3.new(12000, 12000, -12000),
+	LinearVel  = Vector3.new(7000, 8000, 7000),   -- Lực đẩy tuyến tính cực mạnh
+	AngularVel = Vector3.new(12000, 12000, -12000), -- Lực xoáy góc cực mạnh
 	SpeedUnit  = 50,
 }
 
@@ -372,11 +372,11 @@ new("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
 	LayoutOrder = nextOrder(), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.sub,
 	TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Text = "Gợi ý: Khóa chuyển động nhân vật gốc, camera tự động bám theo khối cầu điều khiển.\n"
-		.. "Phụ kiện tách rời thực hiện quét fling mượt mà.",
+	Text = "Gợi ý: Đã kích hoạt hàm tăng vận tốc cực đại trực tiếp vào phụ kiện fling.\n"
+		.. "Lại gần mục tiêu trong 20 studs để quét và hất văng lập tức.",
 }, body)
 ----------------------------------------------------------------------
--- LOGIC KHÓA NHÂN VẬT GỐC, CAMERA & ACCESSORY FLING
+-- LOGIC TRUYỀN VẬN TỐC CỰC ĐẠI CHO PHỤ KIỆN & FLING
 ----------------------------------------------------------------------
 local char, hum, hrp
 local fake, runConn, diedConn, ancConn
@@ -392,7 +392,6 @@ local function getChar()
 	return hum ~= nil and hrp ~= nil
 end
 
--- Lấy Handle phụ kiện & tiến hành XÓA KHỚP WELD + BẬT VA CHẠM
 local function prepareAccessoryHandle()
 	if not char then return nil end
 	for _, child in ipairs(char:GetChildren()) do
@@ -506,11 +505,8 @@ start = function()
 	end
 
 	state.active = true
-	
-	-- Khóa thân nhân vật gốc lại để nhân vật đứng yên an toàn
 	hrp.Anchored = true
 
-	-- Tạo khối cầu ảo làm tâm điều khiển
 	fake = new("Part", {
 		Name = "AccFlingCore", Shape = Enum.PartType.Ball, Size = Vector3.new(3, 3, 3),
 		Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
@@ -524,10 +520,10 @@ start = function()
 			return
 		end
 
-		-- Duy trì bật CanCollide liên tục cho Handle
+		-- Duy trì va chạm vật lý cho phụ kiện
 		accHandle.CanCollide = true
 
-		-- 1) Di chuyển khối cầu lõi bằng phím/joystick của bạn
+		-- 1) Di chuyển khối cầu lõi bằng phím/joystick
 		local vert = (state.up and 1 or 0) - (state.down and 1 or 0)
 		local mv = hum.MoveDirection + Vector3.new(0, vert, 0)
 		if mv.Magnitude > 0 then
@@ -551,12 +547,13 @@ start = function()
 			local offsetDist = toggleSide and 0.5 or -0.5
 			local offsetCF = targetPart.CFrame * CFrame.new(0, 0, offsetDist)
 
-			-- Dịch chuyển Handle phụ kiện tới đối thủ và áp dụng lực cực đại
+			-- Dịch chuyển Handle phụ kiện tới đối thủ
 			accHandle.CFrame = offsetCF * CFrame.Angles(
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)),
 				math.rad(math.random(-180, 180)))
 			
+			-- KÍCH HOẠT HÀM TĂNG VẬN TỐC TUYẾN TÍNH VÀ GÓC CỰC ĐẠI CHO PHỤ KIỆN
 			accHandle.AssemblyLinearVelocity = CFG.LinearVel
 			accHandle.AssemblyAngularVelocity = CFG.AngularVel
 		else
