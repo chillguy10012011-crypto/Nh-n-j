@@ -1,14 +1,4 @@
 
-
--- [HTTPGET #1]: https://scriptblox.com/raw/Universal-Script-Grab-Knife-V4-56561
-loadstring(game:HttpGet("https://raw.githubusercontent.com/KenzoSSto1/GRAB-KNIFE-V4/refs/heads/main/grabknife.txt"))()
-
-
--- [LOADSTRING #2] - Chunk: nil
-loadstring(game:HttpGet("https://raw.githubusercontent.com/KenzoSSto1/GRAB-KNIFE-V4/refs/heads/main/grabknife.txt"))()
-
-
--- [HTTPGET #3]: https://raw.githubusercontent.com/KenzoSSto1/GRAB-KNIFE-V4/refs/heads/main/grabknife.txt
 local plr = game:GetService("Players").LocalPlayer
 local deb = false
 
