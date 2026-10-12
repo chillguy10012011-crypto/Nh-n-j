@@ -1,0 +1,111 @@
+-- Khởi tạo các dịch vụ cơ bản
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local player = Players.LocalPlayer
+
+-- Tạo ScreenGui trong CoreGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GhostCameraHub"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+-- Khung chính của GUI
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 120)
+mainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Tiêu đề GUI
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Text = "Ghost Desync & Camera Lock"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 15
+title.Parent = mainFrame
+
+-- Nút Bật/Tắt chế độ Hồn Ma & Camera
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.9, 0, 0, 50)
+toggleBtn.Position = UDim2.new(0.05, 0, 0, 45)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "Hồn Ma & Camera (OFF)"
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = mainFrame
+
+-- Tạo một Part ẩn làm "vùng chứa" Humanoid dưới đáy vực Void
+local safePart = Instance.new("Part")
+safePart.Name = "HiddenHumanoidHolder"
+safePart.Size = Vector3.new(1, 1, 1)
+safePart.Position = Vector3.new(0, -500, 0)
+safePart.Anchored = true
+safePart.Transparency = 1
+safePart.CanCollide = false
+safePart.Parent = Workspace
+
+local ghostEnabled = false
+local loopConnection = nil
+
+toggleBtn.MouseButton1Click:Connect(function()
+	ghostEnabled = not ghostEnabled
+	
+	if ghostEnabled then
+		toggleBtn.Text = "Hồn Ma & Camera (ON)"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+		
+		-- Vòng lặp chạy mỗi khung hình để ép chuyển Humanoid, chặn chết và khóa Camera theo đầu
+		loopConnection = RunService.RenderStepped:Connect(function()
+			local character = player.Character
+			if not character then return end
+			
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local head = character:FindFirstChild("Head")
+			
+			-- 1. Liên tục bứng Humanoid sang Part ẩn dưới map và chặn trạng thái chết
+			if humanoid and humanoid.Parent ~= safePart then
+				humanoid.Parent = safePart
+			end
+			
+			if humanoid then
+				humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+				if getconnections then
+					for _, conn in ipairs(getconnections(humanoid.Died)) do
+						conn:Disable()
+					end
+				end
+			end
+			
+			-- 2. Ép Camera luôn bám theo phần Head của nhân vật
+			if head then
+				Camera.CameraSubject = head
+			end
+		end)
+	else
+		toggleBtn.Text = "Hồn Ma & Camera (OFF)"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		
+		-- Ngắt vòng lặp
+		if loopConnection then
+			loopConnection:Disconnect()
+			loopConnection = nil
+		end
+		
+		-- Trả Humanoid về lại character và khôi phục camera mặc định
+		local character = player.Character
+		if character and safePart:FindFirstChildOfClass("Humanoid") then
+			local h = safePart:FindFirstChildOfClass("Humanoid")
+			h.Parent = character
+			h:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+			Camera.CameraSubject = h
+		end
+	end
+end)
