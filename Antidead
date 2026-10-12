@@ -1,0 +1,108 @@
+-- Khởi tạo các dịch vụ cơ bản
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- Tạo ScreenGui trong CoreGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DisableDiedMechanicHub"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+-- Khung chính của GUI
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 250, 0, 110)
+mainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Text = "Died Event Disabler"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.Parent = mainFrame
+
+-- Nút Bật/Tắt Ngắt Sự Kiện Died
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.9, 0, 0, 45)
+toggleBtn.Position = UDim2.new(0.05, 0, 0, 45)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "Ngắt Cơ Chế Died (OFF)"
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = mainFrame
+
+local isDiedDisabled = false
+local loopConnection = nil
+
+-- Hàm liên tục xóa/vô hiệu hóa sự kiện Died và trạng thái Dead của Humanoid
+local function applyDiedBypass()
+	local character = player.Character
+	if not character then return end
+	
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	-- 1. Chặn thuộc tính State không cho chuyển sang Enum.HumanoidStateType.Dead
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+
+	-- 2. Ngắt các kết nối lắng nghe sự kiện Died (Signal Connections) phía Client
+	if getconnections then
+		for _, conn in ipairs(getconnections(humanoid.Died)) do
+			conn:Disable() -- Vô hiệu hóa kết nối sự kiện Died
+		end
+	end
+end
+
+-- Hàm khôi phục lại trạng thái bình thường khi tắt nút
+local function restoreDied()
+	local character = player.Character
+	if not character then return end
+	
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	-- Cho phép Humanoid chuyển sang trạng thái Dead trở lại
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+
+	-- Bật lại các kết nối sự kiện Died
+	if getconnections then
+		for _, conn in ipairs(getconnections(humanoid.Died)) do
+			conn:Enable()
+		end
+	end
+end
+
+-- Sự kiện click nút Bật/Tắt
+toggleBtn.MouseButton1Click:Connect(function()
+	isDiedDisabled = not isDiedDisabled
+
+	if isDiedDisabled then
+		toggleBtn.Text = "Ngắt Cơ Chế Died (ON)"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+
+		-- Chạy liên tục mỗi khung hình để đảm bảo sự kiện Died bị chặn triệt để
+		loopConnection = RunService.Stepped:Connect(function()
+			if isDiedDisabled then
+				applyDiedBypass()
+			end
+		end)
+	else
+		toggleBtn.Text = "Ngắt Cơ Chế Died (OFF)"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+
+		if loopConnection then
+			loopConnection:Disconnect()
+			loopConnection = nil
+		end
+		restoreDied()
+	end
+end)
