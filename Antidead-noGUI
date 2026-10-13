@@ -1,0 +1,42 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local function setupCharacter(char)
+	local humanoid = char:WaitForChild("Humanoid")
+	
+	-- Lắng nghe sự kiện chết
+	humanoid.Died:Connect(function()
+		print("[Debug] Nhân vật đã chết! Tách Humanoid ra ngoài Workspace...")
+		
+		-- Tạm thời bế Humanoid ra khỏi mô hình nhân vật để chặn không cho game xóa xác ngay lập tức
+		humanoid.Parent = workspace
+		
+		-- Đếm ngược 5 giây trong lúc cái xác đang nằm bất động
+		task.delay(5, function()
+			-- Kiểm tra xem nhân vật cũ còn tồn tại trên Workspace không
+			if char and char.Parent then
+				print("[Debug] Đã qua 5 giây! Tiến hành gắn lại Humanoid vào xác cũ...")
+				
+				-- Nhét lại Humanoid vào character cũ
+				humanoid.Parent = char
+				
+				-- Bơm máu đầy lại để xem cơ thể có "sống lại" ngay tại chỗ không
+				humanoid.Health = humanoid.MaxHealth
+				
+				print("[Debug] Đã gắn và bơm máu xong! Kiểm tra xem game có phản ứng gì không...")
+			else
+				print("[Debug] Cơ thể cũ đã bị game xóa mất tiêu rồi, không gắn vào được nữa.")
+			end
+		end)
+	end)
+end
+
+-- Chạy cho nhân vật hiện tại
+if player.Character then
+	setupCharacter(player.Character)
+end
+
+-- Tự động chạy lại cho các lần respawn sau
+player.CharacterAdded:Connect(function(newChar)
+	setupCharacter(newChar)
+end)
