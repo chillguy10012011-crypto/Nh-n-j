@@ -1,0 +1,49 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+for _, child in ipairs(character:GetChildren()) do
+    if child:IsA("Accessory") then
+        local handle = child:FindFirstChild("Handle")
+        if handle then
+            -- 1. Xóa toàn bộ các liên kết Weld/Joint cũ bám trên handle để nó hoàn toàn tự do
+            for _, v in ipairs(handle:GetChildren()) do
+                if v:IsA("Weld") or v:IsA("WeldConstraint") or v:IsA("Attachment") or v:IsA("JointInstance") then
+                    v:Destroy()
+                end
+            end
+
+            -- 2. Cấu hình vật lý: Bật va chạm nhưng loại bỏ hoàn toàn trọng lực và khối lượng
+            handle.CanCollide = true
+            handle.Massless = true
+            handle.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0) -- Không ma sát, không độ nảy
+
+            -- 3. Tạo NoCollisionConstraint để nó xuyên qua mọi bộ phận trên người chính mình
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part ~= handle then
+                    local noCol = Instance.new("NoCollisionConstraint")
+                    noCol.Part0 = handle
+                    noCol.Part1 = part
+                    noCol.Parent = handle
+                end
+            end
+
+            -- 4. Dùng vòng lặp RenderStepped khóa chặt vị trí trước ngực và triệt tiêu lực đẩy
+            RunService.RenderStepped:Connect(function()
+                if character and rootPart and handle and handle.Parent then
+                    -- Đặt vị trí chính xác cách tâm 4 studs về phía trước
+                    handle.CFrame = rootPart.CFrame * CFrame.new(0, 0, -4)
+                    
+                    -- Triệt tiêu hoàn toàn vận tốc để nó không kéo nhân vật di chuyển
+                    handle.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    handle.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end
+            end)
+        end
+    end
+end
+
+print("🔥 Đã sửa lỗi bay người! Tóc đã được khóa chặt trước ngực và có va chạm với người khác.")
