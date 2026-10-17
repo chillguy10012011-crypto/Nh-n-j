@@ -1,0 +1,117 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- 1. Tạo ScreenGui chính
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ObbyBypassGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+-- 2. Tạo khung giao diện (Main Frame)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 180)
+mainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true -- Cho phép kéo thả bảng đi khắp màn hình
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = mainFrame
+
+-- 3. Tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "⚡ BYPASS RESET OBBY ⚡"
+title.TextColor3 = Color3.fromRGB(255, 255, 0)
+title.TextSize = 14
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+-- 4. Trạng thái hiển thị Remote tìm được
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 50)
+statusLabel.Position = UDim2.new(0, 10, 0, 45)
+statusLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize = 12
+statusLabel.TextWrapped = true
+statusLabel.Font = Enum.Font.Code
+statusLabel.Text = "Đang tìm kiếm Remote Reset trong game..."
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusLabel
+
+-- 5. Nút bấm kích hoạt Reset vô cực
+local resetButton = Instance.new("TextButton")
+resetButton.Size = UDim2.new(1, -20, 0, 45)
+resetButton.Position = UDim2.new(0, 10, 0, 115)
+resetButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.TextSize = 14
+resetButton.Font = Enum.Font.SourceSansBold
+resetButton.Text = "🚀 RESET NGAY LẬP TỨC"
+resetButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = resetButton
+
+-- 6. Thuật toán tự động tìm RemoteEvent/RemoteFunction liên quan đến Reset/Level
+local foundRemote = nil
+
+local function scanForRemotes()
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local nameLower = obj.Name:lower()
+            -- Lọc các từ khóa thường dùng trong game obby
+            if nameLower:find("reset") or nameLower:find("level") or nameLower:find("checkpoint") or nameLower:find("clear") or nameLower:find("reward") then
+                foundRemote = obj
+                statusLabel.Text = "🎯 Đã tìm thấy:\n" .. obj.Name .. " (" .. obj.ClassName .. ")"
+                statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                return
+            end
+        end
+    end
+    statusLabel.Text = "⚠️ Không tìm thấy tự động. Hãy thử bấm nút Reset trong game 1 lần để hệ thống bắt tín hiệu!"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+end
+
+scanForRemotes()
+
+-- Fallback: Nếu chưa thấy, lắng nghe xem có Remote nào vừa được gọi hoặc xuất hiện không
+ReplicatedStorage.DescendantAdded:Connect(function(obj)
+    if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and not foundRemote then
+        local nameLower = obj.Name:lower()
+        if nameLower:find("reset") or nameLower:find("level") or nameLower:find("complete") then
+            foundRemote = obj
+            statusLabel.Text = "🎯 Đã bắt được:\n" .. obj.Name
+            statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        end
+    end
+end)
+
+-- 7. Xử lý sự kiện khi bấm nút trên GUI
+resetButton.MouseButton1Click:Connect(function()
+    if foundRemote then
+        pcall(function()
+            if foundRemote:IsA("RemoteEvent") then
+                foundRemote:FireServer()
+            elseif foundRemote:IsA("RemoteFunction") then
+                foundRemote:InvokeServer()
+            end
+        end)
+        statusLabel.Text = "✨ Đã gửi lệnh Reset qua:\n" .. foundRemote.Name
+    else
+        statusLabel.Text = "❌ Chưa có Remote nào! Hãy bấm nút Reset chuẩn của game 1 lần rồi bấm lại nút này."
+    end
+end)
+
+print("✅ Đã load GUI Bypass Obby thành công!")
