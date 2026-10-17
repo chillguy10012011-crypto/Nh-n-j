@@ -1,0 +1,162 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- 1. Tạo ScreenGui chính cho tính năng Auto Farm Checkpoint
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ObbyAutoFarmGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 210)
+mainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "⚡ AUTO FARM SPAWN PART ⚡"
+title.TextColor3 = Color3.fromRGB(255, 170, 0)
+title.TextSize = 13
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 60)
+statusLabel.Position = UDim2.new(0, 10, 0, 45)
+statusLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize = 12
+statusLabel.TextWrapped = true
+statusLabel.Font = Enum.Font.Code
+statusLabel.Text = "Nhấn nút bên dưới để bắt đầu càn quét SpawnPart!"
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusLabel
+
+-- Nút Bật/Tắt Auto Teleport Farm
+local farmButton = Instance.new("TextButton")
+farmButton.Size = UDim2.new(1, -20, 0, 40)
+farmButton.Position = UDim2.new(0, 10, 0, 115)
+farmButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+farmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmButton.TextSize = 14
+farmButton.Font = Enum.Font.SourceSansBold
+farmButton.Text = "🚀 BẮT ĐẦU AUTO FARM SPAWN"
+farmButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = farmButton
+
+-- Nút Teleport tuần tự từng cái một (Dự phòng)
+local stepButton = Instance.new("TextButton")
+stepButton.Size = UDim2.new(1, -20, 0, 30)
+stepButton.Position = UDim2.new(0, 10, 0, 165)
+stepButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+stepButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+stepButton.TextSize = 12
+stepButton.Font = Enum.Font.SourceSansBold
+stepButton.Text = "🎯 Nhảy đến Spawn tiếp theo (Thủ công)"
+stepButton.Parent = mainFrame
+
+local stepCorner = Instance.new("UICorner")
+stepCorner.CornerRadius = UDim.new(0, 6)
+stepCorner.Parent = stepButton
+
+-- Hàm tìm tất cả các phần có thể là Checkpoint / SpawnPart trong map
+local function getAllSpawnParts()
+    local spawns = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local nameLower = obj.Name:lower()
+            -- Lọc các từ khóa nhận diện checkpoint/spawn trong game obby
+            if nameLower:find("spawn") or nameLower:find("checkpoint") or nameLower:find("stage") or nameLower:find("goal") or nameLower:find("pad") then
+                table.insert(spawns, obj)
+            end
+        end
+    end
+    return spawns
+end
+
+local isFarming = false
+
+-- Chức năng Auto Farm tự động lướt qua các SpawnPart
+farmButton.MouseButton1Click:Connect(function()
+    isFarming = not isFarming
+    if isFarming then
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        farmButton.Text = "⏹️ DỪNG AUTO FARM"
+        
+        task.spawn(function()
+            while isFarming do
+                local character = LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    local rootPart = character.HumanoidRootPart
+                    local spawns = getAllSpawnParts()
+                    
+                    statusLabel.Text = "🔍 Tìm thấy " .. #spawns .. " SpawnPart. Đang càn quét..."
+                    
+                    -- Sắp xếp các Spawn theo khoảng cách gần tới xa so với người chơi
+                    table.sort(spawns, function(a, b)
+                        local distA = (rootPart.Position - a.Position).Magnitude
+                        local distB = (rootPart.Position - b.Position).Magnitude
+                        return distA < distB
+                    end)
+                    
+                    -- Lần lượt dịch chuyển qua từng SpawnPart
+                    for _, spawnPart in ipairs(spawns) do
+                        if not isFarming then break end
+                        if spawnPart and spawnPart.Parent then
+                            -- Teleport lên trên bề mặt SpawnPart một chút để tránh kẹt
+                            rootPart.CFrame = spawnPart.CFrame + Vector3.new(0, 3, 0)
+                            statusLabel.Text = "✨ Đã húp điểm tại:\n" .. spawnPart.Name
+                            task.wait(0.4) -- Đợi 0.4 giây để server nhận diện lệnh chạm và cộng điểm
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    else
+        farmButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        farmButton.Text = "🚀 BẮT ĐẦU AUTO FARM SPAWN"
+        statusLabel.Text = "⏹️ Đã dừng Auto Farm."
+    end
+end)
+
+-- Chức năng bấm từng bước một (Dành cho map nào có cơ chế nhạy cảm cần bấm từ từ)
+local currentIndex = 1
+stepButton.MouseButton1Click:Connect(function()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = character.HumanoidRootPart
+        local spawns = getAllSpawnParts()
+        
+        if #spawns > 0 then
+            if currentIndex > #spawns then currentIndex = 1 end
+            local target = spawns[currentIndex]
+            rootPart.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+            statusLabel.Text = "🎯 Đã nhảy đến [" .. currentIndex .. "/" .. #spawns .. "]:\n" .. target.Name
+            currentIndex = currentIndex + 1
+        else
+            statusLabel.Text = "⚠️ Không tìm thấy SpawnPart nào trong map!"
+        end
+    end
+end)
+
+print("✅ Đã load GUI Auto Farm SpawnPart thành công!")
+
