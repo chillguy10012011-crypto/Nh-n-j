@@ -1,0 +1,114 @@
+local safeCloneRef = cloneref or function(ref) return ref end
+
+local Players = safeCloneRef(game:GetService("Players"))
+local Workspace = safeCloneRef(game:GetService("Workspace"))
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ObbyBlindFarmGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 210)
+mainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "⚡ BLIND AUTO FARM (BLOXTAP FIX) ⚡"
+title.TextColor3 = Color3.fromRGB(255, 170, 0)
+title.TextSize, title.Font = 11, Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 60)
+statusLabel.Position = UDim2.new(0, 10, 0, 45)
+statusLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize, statusLabel.TextWrapped, statusLabel.Font = 11, true, Enum.Font.Code
+statusLabel.Text = "Đã tối ưu cho máy cấu hình thấp / Bloxstrap giới hạn load!"
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusLabel
+
+local farmButton = Instance.new("TextButton")
+farmButton.Size = UDim2.new(1, -20, 0, 40)
+farmButton.Position = UDim2.new(0, 10, 0, 115)
+farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+farmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmButton.TextSize, farmButton.Font = 13, Enum.Font.SourceSansBold
+farmButton.Text = "🚀 BẬT FARM TIẾN LÊN (BẤT CHẤP LOAD)"
+farmButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = farmButton
+
+-- Nút nhảy thủ công tiến tới 1 khoảng
+local stepButton = Instance.new("TextButton")
+stepButton.Size = UDim2.new(1, -20, 0, 30)
+stepButton.Position = UDim2.new(0, 10, 0, 165)
+stepButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+stepButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+stepButton.TextSize, stepButton.Font = 11, Enum.Font.SourceSansBold
+stepButton.Text = "➕ Tiến lên 1 nấc (Thủ công)"
+stepButton.Parent = mainFrame
+
+local stepCorner = Instance.new("UICorner")
+stepCorner.CornerRadius = UDim.new(0, 6)
+stepCorner.Parent = stepButton
+
+local isFarming = false
+local stepDistance = 15 -- Khoảng cách giữa các stage ước tính (có thể tăng giảm tùy map)
+
+farmButton.MouseButton1Click:Connect(function()
+    isFarming = not isFarming
+    if isFarming then
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        farmButton.Text = "⏹️ DỪNG FARM"
+        
+        task.spawn(function()
+            while isFarming do
+                local character = LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    local rootPart = safeCloneRef(character.HumanoidRootPart)
+                    
+                    -- Ép nhân vật dịch chuyển tịnh tiến về phía trước theo hướng nhìn (LookVector) hoặc trục Z
+                    -- Giúp vượt qua các map bị giới hạn load bằng Bloxstrap
+                    rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * stepDistance) + Vector3.new(0, 3, 0)
+                    
+                    statusLabel.Text = "🚀 Đang lướt tịnh tiến vượt map bất chấp giới hạn load!"
+                end
+                task.wait(0.3) -- Tốc độ lướt qua các stage
+            end
+        end)
+    else
+        farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        farmButton.Text = "🚀 BẬT FARM TIẾN LÊN (BẤT CHẤP LOAD)"
+        statusLabel.Text = "⏹️ Đã dừng Farm."
+    end
+end)
+
+stepButton.MouseButton1Click:Connect(function()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = safeCloneRef(character.HumanoidRootPart)
+        rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * stepDistance) + Vector3.new(0, 3, 0)
+        statusLabel.Text = "🎯 Đã phóng tới 1 nấc!"
+    end
+end)
+
+print("✅ Đã load chế độ Blind Farm chống giới hạn Bloxstrap!")
