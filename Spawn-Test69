@@ -1,0 +1,150 @@
+local safeCloneRef = cloneref or function(ref) return ref end
+
+local Players = safeCloneRef(game:GetService("Players"))
+local Workspace = safeCloneRef(game:GetService("Workspace"))
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- 1. GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ObbyStreamFarmGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 190)
+mainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "⚡ FORCE STREAM AUTO FARM ⚡"
+title.TextColor3 = Color3.fromRGB(0, 255, 200)
+title.TextSize = 12
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 55)
+statusLabel.Position = UDim2.new(0, 10, 0, 45)
+statusLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+statusLabel.TextSize = 11
+statusLabel.TextWrapped = true
+statusLabel.Font = Enum.Font.Code
+statusLabel.Text = "Sẵn sàng ép Game load Map để Farm!"
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusLabel
+
+local farmButton = Instance.new("TextButton")
+farmButton.Size = UDim2.new(1, -20, 0, 40)
+farmButton.Position = UDim2.new(0, 10, 0, 110)
+farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+farmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmButton.TextSize = 13
+farmButton.Font = Enum.Font.SourceSansBold
+farmButton.Text = "🚀 BẬT AUTO FARM (ÉP LOAD MAP)"
+farmButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = farmButton
+
+-- 2. Hàm lấy Stage tiếp theo cực chuẩn
+local function getNextSpawnPart()
+    -- Cách 1: Tìm trong thư mục Stages / Checkpoints của Workspace
+    local stagesFolder = Workspace:FindFirstChild("Stages") or Workspace:FindFirstChild("Checkpoints") or Workspace:FindFirstChild("Spawns")
+    
+    -- Lấy Level hiện tại của người chơi
+    local currentLevel = 0
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats then
+        local stageStat = leaderstats:FindFirstChild("Stage") or leaderstats:FindFirstChild("Level")
+        if stageStat then currentLevel = stageStat.Value end
+    end
+
+    if stagesFolder then
+        -- Tìm Stage kế tiếp (Level + 1)
+        local nextStage = stagesFolder:FindFirstChild(tostring(currentLevel + 1)) or stagesFolder:FindFirstChild("Stage" .. (currentLevel + 1))
+        if nextStage then
+            return nextStage:IsA("BasePart") and nextStage or nextStage:FindFirstChildWhichIsA("BasePart")
+        end
+    end
+
+    -- Cách 2: Quét tất cả Part trong Workspace nếu game không gom vào Folder
+    local nearestNext = nil
+    local shortestDist = math.huge
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local myPos = char.HumanoidRootPart.Position
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                local name = obj.Name:lower()
+                if name:find("spawn") or name:find("checkpoint") or name:find("stage") or name:find("pad") then
+                    local dist = (myPos - obj.Position).Magnitude
+                    -- Chọn mốc ở khoảng cách vừa đủ gần (từ 10 đến 150 studs)
+                    if dist > 8 and dist < shortestDist then
+                        shortestDist = dist
+                        nearestNext = obj
+                    end
+                end
+            end
+        end
+    end
+    return nearestNext
+end
+
+local isFarming = false
+
+farmButton.MouseButton1Click:Connect(function()
+    isFarming = not isFarming
+    if isFarming then
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        farmButton.Text = "⏹️ DỪNG FARM"
+        
+        task.spawn(function()
+            while isFarming do
+                local character = LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    local rootPart = safeCloneRef(character.HumanoidRootPart)
+                    local targetPart = getNextSpawnPart()
+                    
+                    if targetPart then
+                        -- 🔥 CHIÊU ĐỘC: Bắt game ÉP LOAD vùng đất nơi chứa targetPart
+                        pcall(function()
+                            Workspace:RequestStreamAsync(targetPart.Position)
+                        end)
+                        
+                        -- Đợi 0.1s cho game nạp Part vào bộ nhớ
+                        task.wait(0.1)
+                        
+                        -- Dịch chuyển chính xác lên SpawnPart
+                        rootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+                        statusLabel.Text = "✨ Đã ép Load & Húp mốc:\n" .. targetPart.Name
+                    else
+                        statusLabel.Text = "🔍 Đang tìm Stage tiếp theo..."
+                    end
+                end
+                task.wait(0.35) -- Tốc độ càn quét
+            end
+        end)
+    else
+        farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        farmButton.Text = "🚀 BẬT AUTO FARM (ÉP LOAD MAP)"
+        statusLabel.Text = "⏹️ Đã dừng Farm."
+    end
+end)
+
+print("✅ Đã load bản Force Stream Auto Farm xịn xò!")
