@@ -1,0 +1,116 @@
+local safeCloneRef = cloneref or function(ref) return ref end
+
+local Players = safeCloneRef(game:GetService("Players"))
+local Workspace = safeCloneRef(game:GetService("Workspace"))
+local RunService = safeCloneRef(game:GetService("RunService"))
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ObbyAutoFarmFixed"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 180)
+mainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "⚡ SMART AUTO FARM OBBY ⚡"
+title.TextColor3 = Color3.fromRGB(0, 255, 128)
+title.TextSize = 12
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 50)
+statusLabel.Position = UDim2.new(0, 10, 0, 45)
+statusLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.TextSize = 12
+statusLabel.TextWrapped = true
+statusLabel.Font = Enum.Font.Code
+statusLabel.Text = "Đã sẵn sàng cuốn chiếu map!"
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusLabel
+
+local farmButton = Instance.new("TextButton")
+farmButton.Size = UDim2.new(1, -20, 0, 45)
+farmButton.Position = UDim2.new(0, 10, 0, 115)
+farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+farmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmButton.TextSize = 14
+farmButton.Font = Enum.Font.SourceSansBold
+farmButton.Text = "🚀 BẬT AUTO FARM THÔNG MINH"
+farmButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 6)
+btnCorner.Parent = farmButton
+
+local isFarming = false
+
+farmButton.MouseButton1Click:Connect(function()
+    isFarming = not isFarming
+    if isFarming then
+        farmButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        farmButton.Text = "⏹️ DỪNG FARM"
+        
+        task.spawn(function()
+            while isFarming do
+                local character = LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    local rootPart = safeCloneRef(character.HumanoidRootPart)
+                    
+                    -- Quét các spawn đang được load quanh người
+                    local spawns = {}
+                    for _, obj in ipairs(Workspace:GetDescendants()) do
+                        if obj:IsA("BasePart") then
+                            local nameLower = obj.Name:lower()
+                            if nameLower:find("spawn") or nameLower:find("checkpoint") or nameLower:find("stage") or nameLower:find("goal") or nameLower:find("pad") then
+                                table.insert(spawns, safeCloneRef(obj))
+                            end
+                        end
+                    end
+                    
+                    if #spawns > 0 then
+                        -- Sắp xếp từ gần tới xa
+                        table.sort(spawns, function(a, b)
+                            return (rootPart.Position - a.Position).Magnitude < (rootPart.Position - b.Position).Magnitude
+                        end)
+                        
+                        -- Lấy mốc gần nhất phía trước mà mình chưa đi qua (hoặc mốc gần nhất)
+                        local target = spawns[1]
+                        if target then
+                            rootPart.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+                            statusLabel.Text = "✨ Đang càn quét mốc:\n" .. target.Name
+                        end
+                    else
+                        statusLabel.Text = "⚠️ Không thấy mốc nào gần đây, đang chờ load..."
+                    end
+                end
+                task.wait(0.5) -- Lặp lại liên tục để cuốn chiếu map dần dần khi map được load
+            end
+        end)
+    else
+        farmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        farmButton.Text = "🚀 BẬT AUTO FARM THÔNG MINH"
+        statusLabel.Text = "⏹️ Đã dừng Farm."
+    end
+end)
+
+print("✅ Đã load bản Smart Auto Farm (Khắc phục lỗi StreamingEnabled)!")
