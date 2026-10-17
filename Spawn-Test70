@@ -5,9 +5,17 @@ local Workspace = safeCloneRef(game:GetService("Workspace"))
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- 1. GUI
+-- 🧹 HÀM TỰ ĐỘNG DỌN DẸP / XÓA GUI CŨ ĐỂ TEST NHIỀU LẦN
+local GUI_NAME = "ObbyStreamFarmGui"
+for _, oldGui in ipairs(PlayerGui:GetChildren()) do
+    if oldGui.Name == GUI_NAME then
+        oldGui:Destroy() -- Tiêu hủy GUI cũ ngay lập tức
+    end
+end
+
+-- 1. Tạo ScreenGui mới
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ObbyStreamFarmGui"
+screenGui.Name = GUI_NAME
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
@@ -41,7 +49,7 @@ statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 statusLabel.TextSize = 11
 statusLabel.TextWrapped = true
 statusLabel.Font = Enum.Font.Code
-statusLabel.Text = "Sẵn sàng ép Game load Map để Farm!"
+statusLabel.Text = "🧹 Đã làm sạch GUI cũ! Sẵn sàng ép Load Map để Farm."
 statusLabel.Parent = mainFrame
 
 local statusCorner = Instance.new("UICorner")
@@ -62,12 +70,10 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 6)
 btnCorner.Parent = farmButton
 
--- 2. Hàm lấy Stage tiếp theo cực chuẩn
+-- 2. Hàm lấy Stage tiếp theo thông minh
 local function getNextSpawnPart()
-    -- Cách 1: Tìm trong thư mục Stages / Checkpoints của Workspace
     local stagesFolder = Workspace:FindFirstChild("Stages") or Workspace:FindFirstChild("Checkpoints") or Workspace:FindFirstChild("Spawns")
     
-    -- Lấy Level hiện tại của người chơi
     local currentLevel = 0
     local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
     if leaderstats then
@@ -76,14 +82,12 @@ local function getNextSpawnPart()
     end
 
     if stagesFolder then
-        -- Tìm Stage kế tiếp (Level + 1)
         local nextStage = stagesFolder:FindFirstChild(tostring(currentLevel + 1)) or stagesFolder:FindFirstChild("Stage" .. (currentLevel + 1))
         if nextStage then
             return nextStage:IsA("BasePart") and nextStage or nextStage:FindFirstChildWhichIsA("BasePart")
         end
     end
 
-    -- Cách 2: Quét tất cả Part trong Workspace nếu game không gom vào Folder
     local nearestNext = nil
     local shortestDist = math.huge
     local char = LocalPlayer.Character
@@ -94,7 +98,6 @@ local function getNextSpawnPart()
                 local name = obj.Name:lower()
                 if name:find("spawn") or name:find("checkpoint") or name:find("stage") or name:find("pad") then
                     local dist = (myPos - obj.Position).Magnitude
-                    -- Chọn mốc ở khoảng cách vừa đủ gần (từ 10 đến 150 studs)
                     if dist > 8 and dist < shortestDist then
                         shortestDist = dist
                         nearestNext = obj
@@ -122,22 +125,21 @@ farmButton.MouseButton1Click:Connect(function()
                     local targetPart = getNextSpawnPart()
                     
                     if targetPart then
-                        -- 🔥 CHIÊU ĐỘC: Bắt game ÉP LOAD vùng đất nơi chứa targetPart
+                        -- Bắt Game ÉP LOAD vùng đất nơi chứa targetPart
                         pcall(function()
                             Workspace:RequestStreamAsync(targetPart.Position)
                         end)
                         
-                        -- Đợi 0.1s cho game nạp Part vào bộ nhớ
                         task.wait(0.1)
                         
-                        -- Dịch chuyển chính xác lên SpawnPart
+                        -- Teleport chính xác đến SpawnPart
                         rootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
                         statusLabel.Text = "✨ Đã ép Load & Húp mốc:\n" .. targetPart.Name
                     else
                         statusLabel.Text = "🔍 Đang tìm Stage tiếp theo..."
                     end
                 end
-                task.wait(0.35) -- Tốc độ càn quét
+                task.wait(0.35)
             end
         end)
     else
@@ -147,4 +149,4 @@ farmButton.MouseButton1Click:Connect(function()
     end
 end)
 
-print("✅ Đã load bản Force Stream Auto Farm xịn xò!")
+print("🧹 Đã dọn dẹp GUI cũ và load bản Force Stream Auto Farm mới thành công!")
