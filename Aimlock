@@ -1,292 +1,402 @@
---// Dịch vụ Roblox
+-- Global Settings & Variables
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
---// Cài đặt thông số mặc định
-local Settings = {
-    Enabled = false,
-    Radius = 120,          -- Bán kính vòng tròn FOV
-    LockDuration = 1.5,    -- Thời gian khóa mục tiêu (giây)
-    TargetPart = "Head"    -- "Head", "HumanoidRootPart", hoặc "LowerTorso"
+-- Config Values
+local Config = {
+    AimlockEnabled = false,
+    TargetPart = "Head", -- "Head", "UpperTorso", "HumanoidRootPart", "RightHand", "LeftFoot"
+    FovRadius = 120,
+    FovThickness = 2,
+    LockDuration = 1.5,
+    SmoothnessEnabled = true,
+    SmoothnessAmount = 0.2, -- 0.01 (rất mượt/chậm) -> 1 (ngay lập tức)
+    PredictionEnabled = true,
+    PredictionFactor = 0.135 -- Hệ số dự đoán vị trí di chuyển
 }
 
-local currentTarget = nil
-local lockStartTime = 0
+local CurrentTarget = nil
+local LockStartTime = 0
+local TargetPartsList = {"Head", "UpperTorso", "HumanoidRootPart", "RightHand", "LeftFoot"}
 
---// Tạo GUI chính
+-- FOV Circle (Drawing API)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Color = Color3.fromRGB(0, 255, 0) -- Mặc định Xanh lá
+FOVCircle.Thickness = Config.FovThickness
+FOVCircle.NumSides = 64
+FOVCircle.Radius = Config.FovRadius
+FOVCircle.Filled = false
+
+-- UI Setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "NeonAimlockGui"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.CoreGui
 
--- Khung chính
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 220, 0, 95)
-MainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 10)
-MainCorner.Parent = MainFrame
-
--- Viền Neon cho Khung chính
-MainFrame.BorderSizePixel = 0
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(0, 255, 255) -- Xanh Neon
-MainStroke.Thickness = 2
-MainStroke.Parent = MainFrame
-
--- Tiêu đề
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 25)
-Title.BackgroundTransparency = 1
-Title.Text = "⚡ AIMLOCK HUB ⚡"
-Title.TextColor3 = Color3.fromRGB(0, 255, 255)
-Title.TextSize = 13
-Title.Font = Enum.Font.GothamBold
-Title.Parent = MainFrame
-
--- Nút Bật/Tắt chính
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 140, 0, 35)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 40)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-ToggleBtn.Text = "Trạng thái: TẮT"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 70, 70)
-ToggleBtn.TextSize = 12
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Parent = MainFrame
-
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0, 6)
-ToggleCorner.Parent = ToggleBtn
-
--- Nút Cài đặt (Dấu 3 chấm giống X-Ray)
-local SettingsBtn = Instance.new("TextButton")
-SettingsBtn.Size = UDim2.new(0, 45, 0, 35)
-SettingsBtn.Position = UDim2.new(0, 160, 0, 40)
-SettingsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-SettingsBtn.Text = "..."
-SettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SettingsBtn.TextSize = 18
-SettingsBtn.Font = Enum.Font.GothamBold
-SettingsBtn.Parent = MainFrame
-
-local SettingsCorner = Instance.new("UICorner")
-SettingsCorner.CornerRadius = UDim.new(0, 6)
-SettingsCorner.Parent = SettingsBtn
-
--- Vòng tròn Neon FOV (Tâm màn hình)
-local FOVCircle = Instance.new("Frame")
-FOVCircle.Size = UDim2.new(0, Settings.Radius * 2, 0, Settings.Radius * 2)
-FOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-FOVCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
-FOVCircle.BackgroundTransparency = 1
-FOVCircle.Visible = false
-FOVCircle.Parent = ScreenGui
-
-local CircleCorner = Instance.new("UICorner")
-CircleCorner.CornerRadius = UDim.new(1, 0)
-CircleCorner.Parent = FOVCircle
-
-local CircleStroke = Instance.new("UIStroke")
-CircleStroke.Color = Color3.fromRGB(0, 255, 128) -- Xanh lá neon
-CircleStroke.Thickness = 2
-CircleStroke.Parent = FOVCircle
-
--- Menu Cài đặt Chi Tiết
-local SettingsFrame = Instance.new("Frame")
-SettingsFrame.Size = UDim2.new(0, 240, 0, 170)
-SettingsFrame.Position = UDim2.new(0.05, 230, 0.15, 0)
-SettingsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-SettingsFrame.Visible = false
-SettingsFrame.Active = true
-SettingsFrame.Draggable = true
-SettingsFrame.Parent = ScreenGui
-
-local SCorner = Instance.new("UICorner")
-SCorner.CornerRadius = UDim.new(0, 10)
-SCorner.Parent = SettingsFrame
-
-local SStroke = Instance.new("UIStroke")
-SStroke.Color = Color3.fromRGB(255, 0, 255) -- Hồng Neon
-SStroke.Thickness = 2
-SStroke.Parent = SettingsFrame
-
-local STitle = Instance.new("TextLabel")
-STitle.Size = UDim2.new(1, 0, 0, 25)
-STitle.BackgroundTransparency = 1
-STitle.Text = "CÀI ĐẶT THÔNG SỐ"
-STitle.TextColor3 = Color3.fromRGB(255, 0, 255)
-STitle.TextSize = 12
-STitle.Font = Enum.Font.GothamBold
-STitle.Parent = SettingsFrame
-
--- Nút Chỉnh Bán Kính FOV
-local RadiusBtn = Instance.new("TextButton")
-RadiusBtn.Size = UDim2.new(0, 220, 0, 35)
-RadiusBtn.Position = UDim2.new(0, 10, 0, 35)
-RadiusBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-RadiusBtn.Text = "Bán kính vòng tròn: " .. Settings.Radius
-RadiusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-RadiusBtn.TextSize = 11
-RadiusBtn.Font = Enum.Font.Gotham
-RadiusBtn.Parent = SettingsFrame
-Instance.new("UICorner", RadiusBtn).CornerRadius = UDim.new(0, 6)
-
--- Nút Chỉnh Vị Trí Ngắm (Đầu / Thân / Chân)
-local PartBtn = Instance.new("TextButton")
-PartBtn.Size = UDim2.new(0, 220, 0, 35)
-PartBtn.Position = UDim2.new(0, 10, 0, 75)
-PartBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-PartBtn.Text = "Vị trí khóa: Đầu (Head)"
-PartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PartBtn.TextSize = 11
-PartBtn.Font = Enum.Font.Gotham
-PartBtn.Parent = SettingsFrame
-Instance.new("UICorner", PartBtn).CornerRadius = UDim.new(0, 6)
-
--- Nút Chỉnh Thời Gian Khóa
-local TimeBtn = Instance.new("TextButton")
-TimeBtn.Size = UDim2.new(0, 220, 0, 35)
-TimeBtn.Position = UDim2.new(0, 10, 0, 115)
-TimeBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-TimeBtn.Text = "Thời gian khóa: " .. Settings.LockDuration .. "s"
-TimeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TimeBtn.TextSize = 11
-TimeBtn.Font = Enum.Font.Gotham
-TimeBtn.Parent = SettingsFrame
-Instance.new("UICorner", TimeBtn).CornerRadius = UDim.new(0, 6)
-
---// Logic Xử Lý Giao Diện
-ToggleBtn.MouseButton1Click:Connect(function()
-    Settings.Enabled = not Settings.Enabled
-    if Settings.Enabled then
-        ToggleBtn.Text = "Trạng thái: BẬT"
-        ToggleBtn.TextColor3 = Color3.fromRGB(70, 255, 70)
-        FOVCircle.Visible = true
-    else
-        ToggleBtn.Text = "Trạng thái: TẮT"
-        ToggleBtn.TextColor3 = Color3.fromRGB(255, 70, 70)
-        FOVCircle.Visible = false
-        currentTarget = nil
-    end
-end)
-
-SettingsBtn.MouseButton1Click:Connect(function()
-    SettingsFrame.Visible = not SettingsFrame.Visible
-end)
-
--- Thay đổi bán kính vòng tròn
-RadiusBtn.MouseButton1Click:Connect(function()
-    if Settings.Radius == 120 then
-        Settings.Radius = 180
-    elseif Settings.Radius == 180 then
-        Settings.Radius = 240
-    else
-        Settings.Radius = 120
-    end
-    FOVCircle.Size = UDim2.new(0, Settings.Radius * 2, 0, Settings.Radius * 2)
-    RadiusBtn.Text = "Bán kính vòng tròn: " .. Settings.Radius
-end)
-
--- Thay đổi vị trí ngắm
-local partsList = {"Head", "HumanoidRootPart", "LowerTorso"}
-local partNamesVN = {"Đầu (Head)", "Thân (Torso)", "Chân (LowerTorso)"}
-local partIndex = 1
-PartBtn.MouseButton1Click:Connect(function()
-    partIndex = partIndex + 1
-    if partIndex > #partsList then partIndex = 1 end
-    Settings.TargetPart = partsList[partIndex]
-    PartBtn.Text = "Vị trí khóa: " .. partNamesVN[partIndex]
-end)
-
--- Thay đổi thời gian khóa
-local timesList = {1.0, 1.5, 2.0, 3.0}
-local timeIndex = 2
-TimeBtn.MouseButton1Click:Connect(function()
-    timeIndex = timeIndex + 1
-    if timeIndex > #timesList then timeIndex = 1 end
-    Settings.LockDuration = timesList[timeIndex]
-    TimeBtn.Text = "Thời gian khóa: " .. Settings.LockDuration .. "s"
-end)
-
---// Kiểm tra tầm nhìn không bị vật cản (Raycast)
-local function isVisible(targetPart)
-    local origin = Camera.CFrame.Position
-    local direction = targetPart.Position - origin
-    
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    raycastParams.IgnoreWater = true
-    
-    local result = Workspace:Raycast(origin, direction, raycastParams)
-    if result then
-        -- Nếu vật cản là một phần của nhân vật mục tiêu thì coi như thấy được
-        local hitPart = result.Instance
-        if hitPart:IsDescendantOf(targetPart.Parent) then
-            return true
-        end
-        return false
-    end
-    return true
+-- Handle Synapse/Krnl/Delta GUI Core Parent
+if gethui then
+    ScreenGui.Parent = gethui()
+elseif syn and syn.protect_gui then
+    syn.protect_gui(ScreenGui)
+    ScreenGui.Parent = game:GetService("CoreGui")
+else
+    ScreenGui.Parent = game:GetService("CoreGui")
 end
 
---// Logic Aimlock Quét & Khóa Mục Tiêu
-RunService.RenderStepped:Connect(function()
-    if not Settings.Enabled then return end
+-- Main Frame (Nền đen, viền neon xanh biển)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 110) -- Ban đầu thu gọn
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+
+-- Neon Blue Border (Viền Neon Xanh biển)
+local UIStrokeMain = Instance.new("UIStroke")
+UIStrokeMain.Parent = MainFrame
+UIStrokeMain.Color = Color3.fromRGB(0, 210, 255)
+UIStrokeMain.Thickness = 2.5
+UIStrokeMain.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 8)
+UICornerMain.Parent = MainFrame
+
+-- Title
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Parent = MainFrame
+TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+TitleLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Text = "AIMLOCK HUB"
+TitleLabel.TextColor3 = Color3.fromRGB(20, 20, 20)
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.TextSize = 18
+
+-- Neon Red Text Effect
+local TitleStroke = Instance.new("UIStroke")
+TitleStroke.Parent = TitleLabel
+TitleStroke.Color = Color3.fromRGB(255, 30, 30)
+TitleStroke.Thickness = 1.5
+
+-- Container cho Nút 1 & Nút 2
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Parent = MainFrame
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Position = UDim2.new(0, 5, 0, 35)
+ButtonContainer.Size = UDim2.new(1, -10, 0, 70)
+
+-- Helper Function Tạo Button
+local function CreateButton(name, text, posY)
+    local btnFrame = Instance.new("Frame")
+    btnFrame.Parent = ButtonContainer
+    btnFrame.Size = UDim2.new(1, 0, 0, 30)
+    btnFrame.Position = UDim2.new(0, 0, 0, posY)
+    btnFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     
-    local currentTime = tick()
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 5)
+    btnCorner.Parent = btnFrame
     
-    -- Nếu đang có mục tiêu và chưa hết thời gian khóa (1.5s...)
-    if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("Humanoid") and currentTarget.Character.Humanoid.Health > 0 then
-        if (currentTime - lockStartTime) < Settings.LockDuration then
-            local part = currentTarget.Character:FindFirstChild(Settings.TargetPart)
-            if part and isVisible(part) then
-                -- Ép camera nhìn thẳng vào phần thân/đầu của người chơi đó (giống Shiftlock)
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, part.Position)
-                return
-            end
-        else
-            currentTarget = nil
-        end
+    local btnStroke = Instance.new("UIStroke")
+    btnStroke.Parent = btnFrame
+    btnStroke.Color = Color3.fromRGB(255, 0, 50) -- Neon Red Outline
+    btnStroke.Thickness = 1.5
+
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Parent = btnFrame
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(15, 15, 15)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 15
+
+    return btn, btnFrame
+end
+
+local AimlockBtn, AimlockFrame = CreateButton("AimlockBtn", "Aimlock: OFF", 0)
+local SettingBtn, SettingFrame = CreateButton("SettingBtn", "Setting [v]", 35)
+
+-- Bảng Settings (Mở rộng theo chiều dọc)
+local SettingsPanel = Instance.new("ScrollingFrame")
+SettingsPanel.Name = "SettingsPanel"
+SettingsPanel.Parent = MainFrame
+SettingsPanel.Position = UDim2.new(0, 5, 0, 110)
+SettingsPanel.Size = UDim2.new(1, -10, 0, 280)
+SettingsPanel.BackgroundTransparency = 1
+SettingsPanel.CanvasSize = UDim2.new(0, 0, 0, 300)
+SettingsPanel.ScrollBarThickness = 4
+SettingsPanel.Visible = false
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = SettingsPanel
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 6)
+
+-- Helper Tạo TextBox/Option trong Settings
+local function CreateSettingInput(label, defaultVal, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -5, 0, 32)
+    frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Parent = frame
+    stroke.Color = Color3.fromRGB(255, 0, 50)
+    stroke.Thickness = 1.2
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = frame
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = " " .. label
+    lbl.TextColor3 = Color3.fromRGB(10, 10, 10)
+    lbl.Font = Enum.Font.SourceSansBold
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local box = Instance.new("TextBox")
+    box.Parent = frame
+    box.Size = UDim2.new(0.38, -5, 0.8, 0)
+    box.Position = UDim2.new(0.6, 0, 0.1, 0)
+    box.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+    box.Text = tostring(defaultVal)
+    box.TextColor3 = Color3.fromRGB(0, 0, 0)
+    box.Font = Enum.Font.SourceSansBold
+    box.TextSize = 13
+
+    box.FocusLost:Connect(function()
+        callback(box.Text)
+    end)
+
+    frame.Parent = SettingsPanel
+    return box
+end
+
+local function CreateSettingToggle(label, defaultState, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -5, 0, 32)
+    frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Parent = frame
+    stroke.Color = Color3.fromRGB(255, 0, 50)
+    stroke.Thickness = 1.2
+
+    local btn = Instance.new("TextButton")
+    btn.Parent = frame
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = label .. ": " .. (defaultState and "ON" or "OFF")
+    btn.TextColor3 = Color3.fromRGB(10, 10, 10)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 13
+
+    local state = defaultState
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = label .. ": " .. (state and "ON" or "OFF")
+        callback(state)
+    end)
+
+    frame.Parent = SettingsPanel
+end
+
+-- TẠO CÁC CONTROL TRONG SETTING
+-- 1. Tùy chỉnh Bộ Phận (Text Choice)
+local TargetPartIndex = 1
+local PartToggleFrame = Instance.new("Frame")
+PartToggleFrame.Size = UDim2.new(1, -5, 0, 32)
+PartToggleFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", PartToggleFrame).CornerRadius = UDim.new(0, 4)
+local pStroke = Instance.new("UIStroke", PartToggleFrame)
+pStroke.Color = Color3.fromRGB(255, 0, 50)
+pStroke.Thickness = 1.2
+
+local PartBtn = Instance.new("TextButton", PartToggleFrame)
+PartBtn.Size = UDim2.new(1, 0, 1, 0)
+PartBtn.BackgroundTransparency = 1
+PartBtn.Text = "Bộ phận nhắm: " .. Config.TargetPart
+PartBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+PartBtn.Font = Enum.Font.SourceSansBold
+PartBtn.TextSize = 13
+PartToggleFrame.Parent = SettingsPanel
+
+PartBtn.MouseButton1Click:Connect(function()
+    TargetPartIndex = TargetPartIndex + 1
+    if TargetPartIndex > #TargetPartsList then TargetPartIndex = 1 end
+    Config.TargetPart = TargetPartsList[TargetPartIndex]
+    PartBtn.Text = "Bộ phận nhắm: " .. Config.TargetPart
+end)
+
+-- 2. Kích thước vòng tròn (Bán kính)
+CreateSettingInput("Bán kính FOV:", Config.FovRadius, function(val)
+    local num = tonumber(val)
+    if num then
+        Config.FovRadius = num
+        FOVCircle.Radius = num
     end
-    
-    -- Quét người chơi mới nằm trong vòng tròn FOV tâm màn hình
-    local mouseCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+end)
+
+-- 3. Độ dày đường tròn
+CreateSettingInput("Độ dày FOV:", Config.FovThickness, function(val)
+    local num = tonumber(val)
+    if num then
+        Config.FovThickness = num
+        FOVCircle.Thickness = num
+    end
+end)
+
+-- 4. Thời gian khóa (Giây)
+CreateSettingInput("Thời gian khóa (s):", Config.LockDuration, function(val)
+    local num = tonumber(val)
+    if num then Config.LockDuration = num end
+end)
+
+-- 5. Độ mượt
+CreateSettingToggle("Độ mượt (Smoothness)", Config.SmoothnessEnabled, function(state)
+    Config.SmoothnessEnabled = state
+end)
+
+CreateSettingInput("Hệ số mượt (0.01-1):", Config.SmoothnessAmount, function(val)
+    local num = tonumber(val)
+    if num then Config.SmoothnessAmount = math.clamp(num, 0.01, 1) end
+end)
+
+-- 6. Dự đoán vận tốc
+CreateSettingToggle("Dự đoán vận tốc", Config.PredictionEnabled, function(state)
+    Config.PredictionEnabled = state
+end)
+
+-- LOGIC MỞ RỘNG/THU GỌN SETTING (Vertical Extension)
+local IsSettingOpen = false
+SettingBtn.MouseButton1Click:Connect(function()
+    IsSettingOpen = not IsSettingOpen
+    if IsSettingOpen then
+        MainFrame:TweenSize(UDim2.new(0, 220, 0, 400), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+        SettingsPanel.Visible = true
+        SettingBtn.Text = "Setting [^]"
+    else
+        SettingsPanel.Visible = false
+        MainFrame:TweenSize(UDim2.new(0, 220, 0, 110), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+        SettingBtn.Text = "Setting [v]"
+    end
+end)
+
+-- Toggle Aimlock Button
+AimlockBtn.MouseButton1Click:Connect(function()
+    Config.AimlockEnabled = not Config.AimlockEnabled
+    AimlockBtn.Text = "Aimlock: " .. (Config.AimlockEnabled and "ON" or "OFF")
+    FOVCircle.Visible = Config.AimlockEnabled
+    if not Config.AimlockEnabled then
+        CurrentTarget = nil
+        FOVCircle.Color = Color3.fromRGB(0, 255, 0)
+    end
+end)
+
+-- CORE AIMLOCK LOGIC
+local function GetClosestTarget()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     local closestPlayer = nil
-    local shortestDist = Settings.Radius
-    
+    local shortestDistance = Config.FovRadius
+
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local targetPart = player.Character:FindFirstChild(Settings.TargetPart)
-            if targetPart then
-                local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            local part = player.Character:FindFirstChild(Config.TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
-                    local screenPos2D = Vector2.new(screenPoint.X, screenPoint.Y)
-                    local dist = (screenPos2D - mouseCenter).Magnitude
+                    -- Kiểm tra che khuất (Raycast visibility check)
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterType = RaycastFilterType.Exclude
+                    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, player.Character}
                     
-                    if dist < shortestDist and isVisible(targetPart) then
-                        shortestDist = dist
-                        closestPlayer = player
+                    local rayResult = Workspace:Raycast(Camera.CFrame.Position, part.Position - Camera.CFrame.Position, raycastParams)
+                    
+                    if not rayResult then -- Không bị vật cản/tường chắn
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                        if dist < shortestDistance then
+                            shortestDistance = dist
+                            closestPlayer = player
+                        end
                     end
                 end
             end
         end
     end
-    
-    if closestPlayer then
-        currentTarget = closestPlayer
-        lockStartTime = currentTime
+    return closestPlayer
+end
+
+-- RenderStepped Update Loop
+RunService.RenderStepped:Connect(function()
+    -- Cập nhật tâm FOV theo giữa màn hình (Shiftlock center)
+    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    FOVCircle.Position = centerScreen
+
+    if not Config.AimlockEnabled then return end
+
+    -- Quản lý thời gian Khóa Target
+    if CurrentTarget then
+        -- Kiểm tra điều kiện sống / khoảng thời gian khóa
+        local char = CurrentTarget.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        local isExpired = (tick() - LockStartTime) > Config.LockDuration
+
+        if not char or not hum or hum.Health <= 0 or isExpired then
+            CurrentTarget = nil
+            FOVCircle.Color = Color3.fromRGB(0, 255, 0) -- Trở lại Xanh lá
+        end
+    end
+
+    -- Tìm mục tiêu mới nếu chưa có
+    if not CurrentTarget then
+        local target = GetClosestTarget()
+        if target then
+            CurrentTarget = target
+            LockStartTime = tick()
+        end
+    end
+
+    -- Khóa và Xử lý Aim/Prediction
+    if CurrentTarget and CurrentTarget.Character then
+        local targetPart = CurrentTarget.Character:FindFirstChild(Config.TargetPart) or CurrentTarget.Character:FindFirstChild("HumanoidRootPart")
+        
+        if targetPart then
+            -- Đổi màu FOV sang ĐỎ báo hiệu đang trong tâm khóa
+            FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+
+            -- Tính toán Vận tốc & Lead Prediction
+            local predictedPos = targetPart.Position
+            if Config.PredictionEnabled then
+                local velocity = targetPart.AssemblyLinearVelocity or targetPart.Velocity
+                predictedPos = targetPart.Position + (velocity * Config.PredictionFactor)
+            end
+
+            -- Điều hướng Camera / Shiftlock
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+            if Config.SmoothnessEnabled then
+                Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Config.SmoothnessAmount)
+            else
+                Camera.CFrame = targetCFrame
+            end
+        end
+    else
+        FOVCircle.Color = Color3.fromRGB(0, 255, 0) -- Màu xanh lá mặc định khi không tìm thấy target
     end
 end)
