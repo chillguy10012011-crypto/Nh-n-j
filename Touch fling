@@ -1,0 +1,198 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local plr = Players.LocalPlayer
+local gui = plr:WaitForChild("PlayerGui")
+
+-- Xóa GUI cũ nếu có để tránh bị đè
+if gui:FindFirstChild("LiteNeonFling") then
+    gui.LiteNeonFling:Destroy()
+end
+
+-- Tạo ScreenGui chính
+local sc = Instance.new("ScreenGui")
+sc.Name = "LiteNeonFling"
+sc.ResetOnSpawn = false
+sc.Parent = gui
+
+-- Khung chính (Main Frame)
+local frm = Instance.new("Frame")
+frm.Size = UDim2.new(0, 210, 0, 110)
+frm.Position = UDim2.new(0.5, -105, 0.5, -55)
+frm.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frm.Active = true
+frm.Draggable = true
+frm.Parent = sc
+
+Instance.new("UICorner", frm).CornerRadius = UDim.new(0, 8)
+
+-- Viền Neon cho Khung chính
+local frmStroke = Instance.new("UIStroke")
+frmStroke.Color = Color3.fromRGB(0, 255, 100)
+frmStroke.Thickness = 2
+frmStroke.Parent = frm
+
+-- Thanh tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.TextColor3 = Color3.fromRGB(0, 255, 100)
+title.Text = "  Lite Fling Hub + Neon"
+title.TextSize = 13
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frm
+
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+
+-- Nút Xóa GUI (X)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -27, 0, 3)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "X"
+closeBtn.TextSize = 11
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = title
+
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút Thu gọn (-)
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 24, 0, 24)
+minBtn.Position = UDim2.new(1, -55, 0, 3)
+minBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Text = "-"
+minBtn.TextSize = 14
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = title
+
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút Bật/Tắt Fling chính
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -16, 0, 45)
+btn.Position = UDim2.new(0, 8, 0, 45)
+btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Text = "Status: OFF"
+btn.TextSize = 14
+btn.Font = Enum.Font.GothamBold
+btn.Parent = frm
+
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+-- Viền Neon cho Nút bấm (Mặc định màu đỏ khi tắt)
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(255, 50, 50) 
+btnStroke.Thickness = 2
+btnStroke.Parent = btn
+
+-- Biến logic hệ thống
+local isFlinging = false
+local flingConn = nil
+local isMinimized = false
+local neonBox = nil -- Biến lưu khung neon trên người
+
+local function getRoot(char)
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+end
+
+-- Hàm bật/tắt hiệu ứng Neon phát sáng quanh người (tương tự Matrix Hitbox)[span_0](start_span)[span_0](end_span)
+local function toggleNeonVisual(char, root, state)
+    if state then
+        if char and root and not char:FindFirstChild("NeonFlingVisual") then
+            neonBox = Instance.new("SelectionBox")
+            neonBox.Name = "NeonFlingVisual"
+            neonBox.Adornee = root
+            neonBox.Color3 = Color3.fromRGB(0, 255, 100) -- Màu xanh neon rực rỡ
+            neonBox.LineThickness = 0.05
+            neonBox.SurfaceColor3 = Color3.fromRGB(0, 255, 100)
+            neonBox.SurfaceTransparency = 0.8
+            neonBox.Parent = char
+        end
+    else
+        if neonBox then
+            neonBox:Destroy()
+            neonBox = nil
+        end
+        if char then
+            local oldVisual = char:FindFirstChild("NeonFlingVisual")
+            if oldVisual then oldVisual:Destroy() end
+        end
+    end
+end
+
+-- Chức năng nút Xóa (X)
+closeBtn.MouseButton1Click:Connect(function()
+    if flingConn then
+        flingConn:Disconnect()
+    end
+    toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+    sc:Destroy()
+end)
+
+-- Chức năng nút Thu gọn (-) / Mở rộng (+)
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        minBtn.Text = "+"
+        btn.Visible = false
+        frm.Size = UDim2.new(0, 210, 0, 30)
+    else
+        minBtn.Text = "-"
+        btn.Visible = true
+        frm.Size = UDim2.new(0, 210, 0, 110)
+    end
+end)
+
+-- Chức năng Bật/Tắt Fling + Neon Body
+btn.MouseButton1Click:Connect(function()
+    isFlinging = not isFlinging
+    
+    if isFlinging then
+        local char = plr.Character
+        local root = getRoot(char)
+        
+        if not char or not root then
+            btn.Text = "No Character!"
+            isFlinging = false
+            return
+        end
+        
+        btn.Text = "Status: ON (Active)"
+        btnStroke.Color = Color3.fromRGB(0, 255, 100) -- Đổi viền nút sang xanh lá
+        
+        -- Kích hoạt hiệu ứng neon phát sáng trên cơ thể
+        toggleNeonVisual(char, root, true)
+        
+        -- Vòng lặp tối ưu hóa cho máy yếu
+        flingConn = RunService.Heartbeat:Connect(function()
+            if not char.Parent or not root.Parent or not isFlinging then 
+                return 
+            end
+            
+            local lastVel = root.AssemblyLinearVelocity
+            root.AssemblyLinearVelocity = Vector3.new(500000, 250000, 500000)
+            
+            RunService.RenderStepped:Wait()
+            if root and root.Parent then
+                root.AssemblyLinearVelocity = lastVel
+            end
+        end)
+    else
+        btn.Text = "Status: OFF"
+        btnStroke.Color = Color3.fromRGB(255, 50, 50) -- Đổi viền nút về đỏ
+        
+        -- Tắt hiệu ứng neon trên cơ thể
+        toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+        
+        if flingConn then
+            flingConn:Disconnect()
+            flingConn = nil
+        end
+    end
+end)
