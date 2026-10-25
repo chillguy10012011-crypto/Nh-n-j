@@ -1,9 +1,3 @@
-
-
--- [HTTPGET #1]: https://scriptblox.com/raw/Universal-Script-FE-Touch-Fling-with-Animations-R6-R15-245062
-print("sub to openscripts")
---notify: if code obfuscated — it's not original script
-
 --script:
 local plrs = game:GetService("Players")
 local runS = game:GetService("RunService")
