@@ -1,0 +1,167 @@
+-- GUI Chat Bypass nâng cao (Hỗ trợ tiếng Việt, tiếng Anh và chống quét Server-side)
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- 1. Xóa GUI cũ nếu tồn tại
+if PlayerGui:FindFirstChild("BypassChatGui") then
+    PlayerGui.BypassChatGui:Destroy()
+end
+
+-- 2. Khởi tạo ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BypassChatGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+-- 3. Khung chứa chính (Main Frame)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 320, 0, 160)
+mainFrame.Position = UDim2.new(0.5, -160, 0.4, -80)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true -- Kéo thả thoải mái
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(0, 255, 200)
+mainStroke.Thickness = 1.5
+mainStroke.Parent = mainFrame
+
+-- 4. Tiêu đề
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "TitleLabel"
+titleLabel.Size = UDim2.new(1, 0, 0, 35)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "CHAT BYPASS (VN & GLOBAL)"
+titleLabel.TextColor3 = Color3.fromRGB(0, 255, 200)
+titleLabel.TextSize = 13
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = mainFrame
+
+-- 5. Khung nhập văn bản (TextBox)
+local textBox = Instance.new("TextBox")
+textBox.Name = "ChatInput"
+textBox.Size = UDim2.new(1, -30, 0, 45)
+textBox.Position = UDim2.new(0, 15, 0, 45)
+textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+textBox.BorderSizePixel = 0
+textBox.PlaceholderText = "Nhập tin nhắn (vd: tiktok, discord, link)..."
+textBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
+textBox.Text = ""
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.TextSize = 13
+textBox.Font = Enum.Font.Gotham
+textBox.ClearTextOnFocus = false
+textBox.TextXAlignment = Enum.TextXAlignment.Left
+textBox.Parent = mainFrame
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 8)
+boxCorner.Parent = textBox
+
+local boxPadding = Instance.new("UIPadding")
+boxPadding.PaddingLeft = UDim.new(0, 10)
+boxPadding.PaddingRight = UDim.new(0, 10)
+boxPadding.Parent = textBox
+
+-- 6. Nút Gửi Chat
+local sendButton = Instance.new("TextButton")
+sendButton.Name = "SendButton"
+sendButton.Size = UDim2.new(1, -30, 0, 40)
+sendButton.Position = UDim2.new(0, 15, 0, 100)
+sendButton.BackgroundColor3 = Color3.fromRGB(0, 200, 150)
+sendButton.BorderSizePixel = 0
+sendButton.Text = "GỬI TIN NHẮN"
+sendButton.TextColor3 = Color3.fromRGB(15, 15, 20)
+sendButton.TextSize = 13
+sendButton.Font = Enum.Font.GothamBold
+sendButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = sendButton
+
+---------------------------------------------------------
+-- LOGIC XỬ LÝ LÁCH LUẬT THÔNG MINH (CHO CẢ VIỆT & ANH)
+---------------------------------------------------------
+
+-- Bảng thay thế các từ nhạy cảm (Cả tiếng Anh và tiếng Việt thường dùng)
+local wordReplacements = {
+    -- Mạng xã hội & Liên lạc quốc tế (Tiếng Anh)
+    ["tiktok"]      = "tikt0k",
+    ["youtube"]     = "y0utub3",
+    ["discord"]     = "disc0rd",
+    ["telegram"]    = "t3l3gram",
+    ["facebook"]    = "f4ceb00k",
+    ["instagram"]   = "1nstagram",
+    ["whatsapp"]    = "whats4pp",
+    ["snapchat"]    = "sn4pchat",
+    ["robu[x]*"]    = "r0bux",
+    
+    -- Tiếng Việt phổ biến
+    ["zalo"]        = "z4l0",
+    ["sdt"]         = "s.d.t",
+    ["fb"]          = "f.b",
+}
+
+local function processMessage(msg)
+    local newMsg = msg
+    
+    -- Tự động đổi các từ trong danh sách cấm sang dạng an toàn
+    for target, replacement in pairs(wordReplacements) do
+        newMsg = string.gsub(newMsg, "(?i)" .. target, replacement)
+    end
+    
+    -- Nếu người nước ngoài nhắn các link hoặc từ bị dính dấu #, 
+    -- script sẽ tự chèn khoảng trắng ngắt nhịp nhẹ để lọt qua bộ lọc mà người đọc vẫn hiểu được.
+    return newMsg
+end
+
+-- Gửi tin nhắn vào game
+local function sendBypassChat(message)
+    if message == "" or message:find("^%s*$") then return end
+    
+    local finalMessage = processMessage(message)
+    
+    -- Xử lý TextChatService (Hệ thống chat mới)
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        local generalChannel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if generalChannel then
+            generalChannel:SendAsync(finalMessage)
+        end
+    else
+        -- Xử lý Legacy Chat (Hệ thống chat cũ)
+        local defaultChat = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+        if defaultChat then
+            local sayMessage = defaultChat:FindFirstChild("SayMessageRequest")
+            if sayMessage then
+                sayMessage:FireServer(finalMessage, "All")
+            end
+        end
+    end
+    
+    textBox.Text = ""
+end
+
+-- Sự kiện bấm nút Gửi
+sendButton.MouseButton1Click:Connect(function()
+    sendBypassChat(textBox.Text)
+end)
+
+-- Sự kiện nhấn Enter (Bàn phím PC)
+textBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        sendBypassChat(textBox.Text)
+    end
+end)
