@@ -1,5 +1,5 @@
 -- =========================================================================
--- BẪY DEOBFUSCATOR ULTIMATE PRO (FIXED & OPTIMIZED FOR ALL EXECUTORS)
+-- BẪY DEOBFUSCATOR ULTIMATE PRO MAX (DEEP DUMP + URL CLEANER) - PHẦN 1
 -- =========================================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -35,7 +35,7 @@ Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = " 📱 Bẫy Deobfuscator Ultimate Pro"
+Title.Text = " 🚀 Bẫy Deobfuscator Pro MAX (Deep Dump)"
 Title.Parent = MainFrame
 
 -- Khung chứa Ô nhập code & Nút Clear
@@ -54,7 +54,7 @@ InputBox.TextSize = 12
 InputBox.Font = Enum.Font.Code
 InputBox.MultiLine = true
 InputBox.ClearTextOnFocus = false
-InputBox.PlaceholderText = "-- Dán code chứa link HttpGet vào đây..."
+InputBox.PlaceholderText = "-- Dán code chứa loadstring/HttpGet vào đây..."
 InputBox.Text = ""
 InputBox.Parent = InputContainer
 
@@ -102,7 +102,7 @@ ExecButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
 ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ExecButton.TextSize = 12
 ExecButton.Font = Enum.Font.SourceSansBold
-ExecButton.Text = "⚡ BÓC TÁC"
+ExecButton.Text = "⚡ SIÊU BÓC TÁC"
 ExecButton.Parent = ToolBar
 
 -- Hàng nhập token GitHub + nút gửi
@@ -202,7 +202,7 @@ OutputBox.MultiLine = true
 OutputBox.ClearTextOnFocus = false
 OutputBox.TextXAlignment = Enum.TextXAlignment.Left
 OutputBox.TextYAlignment = Enum.TextYAlignment.Top
-OutputBox.Text = "-- Kết quả sẽ hiện ở đây..."
+OutputBox.Text = "-- Kết quả siêu bóc tách sẽ hiện ở đây..."
 OutputBox.Parent = ScrollingFrame
 
 -- Menu Cài đặt giới hạn số dòng nổi (Popup)
@@ -280,7 +280,7 @@ end)
 
 CopyBtn.MouseButton1Click:Connect(function()
     local textToCopy = OutputBox.Text
-    if textToCopy and textToCopy ~= "-- Kết quả sẽ hiện ở đây..." then
+    if textToCopy and textToCopy ~= "-- Kết quả siêu bóc tách sẽ hiện ở đây..." then
         Clipboard(textToCopy)
         CopyBtn.Text = "✅ Copied!"
         task.delay(1.5, function()
@@ -288,9 +288,8 @@ CopyBtn.MouseButton1Click:Connect(function()
         end)
     end
 end)
-
 -- =========================================================================
--- LOGIC XỬ LÝ MODE & HIỂN THỊ
+-- BẪY DEOBFUSCATOR ULTIMATE PRO MAX (DEEP DUMP + URL CLEANER) - PHẦN 2
 -- =========================================================================
 local currentMode = 2
 local rawCapturedLogs = {}
@@ -359,9 +358,9 @@ local function uploadToGithub()
         local login = HttpService:JSONDecode(me.Body).login
 
         local content = table.concat(rawCapturedLogs, "\n")
-        local path = "Dump/Dump_" .. os.time() .. ".lua"
+        local path = "Dump/DeepDump_" .. os.time() .. ".lua"
         local url = string.format("https://api.github.com/repos/%s/%s/contents/%s", login, REPO_NAME, path)
-        local body = { message = "Dump from deobfuscator tool", content = toBase64(content) }
+        local body = { message = "Deep Dump from deobfuscator tool", content = toBase64(content) }
 
         local res = ghRequest("PUT", url, body)
 
@@ -476,7 +475,7 @@ NextBtn.MouseButton1Click:Connect(function()
 end)
 
 -- =========================================================================
--- LOGIC BẪY BÓC TÁC ĐA TẦNG & HTTPGET
+-- LOGIC BÓC TÁC ĐA TẦNG & URL SANITIZER
 -- =========================================================================
 ExecButton.MouseButton1Click:Connect(function()
     local rawCode = InputBox.Text
@@ -485,7 +484,7 @@ ExecButton.MouseButton1Click:Connect(function()
         return
     end
 
-    OutputBox.Text = "⏳ Đang bóc tách dữ liệu..."
+    OutputBox.Text = "⏳ Đang tiến hành siêu bóc tách đa tầng..."
     rawCapturedLogs = {}
     pages = {}
     currentPage = 1
@@ -493,20 +492,41 @@ ExecButton.MouseButton1Click:Connect(function()
     local old_loadstring = loadstring
     local loadCount = 0
 
-    local interceptedHttpGet = function(self, url)
+    local function sanitizeUrl(url)
+        local strUrl = tostring(url)
+        strUrl = strUrl:gsub(" ", "%%20")
+        return strUrl
+    end
+
+    local function interceptedHttpGet(self, url)
         loadCount = loadCount + 1
-        local header = string.format("\n\n-- [HTTPGET #%d]: %s\n", loadCount, tostring(url))
+        local cleanUrl = sanitizeUrl(url)
+        local header = string.format("\n\n-- [DEEP HTTPGET #%d]: %s\n", loadCount, cleanUrl)
         
         local success, fileContent = pcall(function()
-            return game:HttpGet(url)
+            return game:HttpGet(cleanUrl)
         end)
         
         if success then
             table.insert(rawCapturedLogs, header .. fileContent)
             updateDisplay()
+            if type(fileContent) == "string" and fileContent:find("loadstring") then
+                pcall(function()
+                    local subFunc = old_loadstring(fileContent)
+                    if subFunc then
+                        setfenv(subFunc, setmetatable({
+                            loadstring = function(c, n) return old_loadstring(c, n) end,
+                            game = setmetatable({
+                                HttpGet = function(s, u) return interceptedHttpGet(s, u) end
+                            }, { __index = game })
+                        }, { __index = getgenv() }))
+                        subFunc()
+                    end
+                end)
+            end
             return fileContent
         else
-            table.insert(rawCapturedLogs, header .. "-- [LỖI TẢI LINK]")
+            table.insert(rawCapturedLogs, header .. "-- [LỖI TẢI LINK HOẶC BỊ CHẶN]")
             updateDisplay()
             return ""
         end
@@ -514,7 +534,7 @@ ExecButton.MouseButton1Click:Connect(function()
 
     local function recursiveTrap(codeChunk, chunkName)
         loadCount = loadCount + 1
-        local header = string.format("\n\n-- [LOADSTRING #%d] - Chunk: %s\n", loadCount, tostring(chunkName))
+        local header = string.format("\n\n-- [DEEP LOADSTRING #%d] - Chunk: %s\n", loadCount, tostring(chunkName))
         table.insert(rawCapturedLogs, header .. tostring(codeChunk))
         updateDisplay()
         
@@ -540,6 +560,8 @@ ExecButton.MouseButton1Click:Connect(function()
             pcall(realFunc)
             return realFunc
         else
+            table.insert(rawCapturedLogs, "-- [LỖI BIÊN DỊCH LOADSTRING]: " .. tostring(loadErr))
+            updateDisplay()
             return function() end
         end
     end
@@ -573,7 +595,7 @@ ExecButton.MouseButton1Click:Connect(function()
     getgenv().loadstring = old_loadstring
 
     if not success and #rawCapturedLogs == 0 then
-        OutputBox.Text = "⚠️ Lỗi thực thi:\n" .. tostring(err)
+        OutputBox.Text = "⚠️ Lỗi thực thi toàn cục:\n" .. tostring(err)
     elseif #rawCapturedLogs > 0 then
         updateDisplay()
     end
