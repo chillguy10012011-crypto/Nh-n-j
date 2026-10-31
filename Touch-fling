@@ -94,21 +94,21 @@ btnStroke.Parent = btn
 local isFlinging = false
 local flingConn = nil
 local isMinimized = false
-local neonBox = nil -- Biến lưu khung neon trên người
+local neonBox = nil
 
 local function getRoot(char)
     if not char then return nil end
     return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
 end
 
--- Hàm bật/tắt hiệu ứng Neon phát sáng quanh người (tương tự Matrix Hitbox)[span_0](start_span)[span_0](end_span)
+-- Hàm bật/tắt hiệu ứng Neon phát sáng quanh người
 local function toggleNeonVisual(char, root, state)
     if state then
         if char and root and not char:FindFirstChild("NeonFlingVisual") then
             neonBox = Instance.new("SelectionBox")
             neonBox.Name = "NeonFlingVisual"
             neonBox.Adornee = root
-            neonBox.Color3 = Color3.fromRGB(0, 255, 100) -- Màu xanh neon rực rỡ
+            neonBox.Color3 = Color3.fromRGB(0, 255, 100)
             neonBox.LineThickness = 0.05
             neonBox.SurfaceColor3 = Color3.fromRGB(0, 255, 100)
             neonBox.SurfaceTransparency = 0.8
@@ -126,11 +126,28 @@ local function toggleNeonVisual(char, root, state)
     end
 end
 
+-- Hàm Bật/Tắt Collision (Va chạm) trên cơ thể
+local function toggleCollision(char, state)
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if state then
+                -- Lưu trạng thái cũ (nếu cần) và tắt va chạm
+                part.CanCollide = false
+            else
+                -- Khôi phục lại va chạm khi tắt Fling
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
 -- Chức năng nút Xóa (X)
 closeBtn.MouseButton1Click:Connect(function()
     if flingConn then
         flingConn:Disconnect()
     end
+    toggleCollision(plr.Character, false)
     toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
     sc:Destroy()
 end)
@@ -149,14 +166,14 @@ minBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Chức năng Bật/Tắt Fling + Neon Body
+-- Chức năng Bật/Tắt Fling + Neon Body + Noclip Collision
 btn.MouseButton1Click:Connect(function()
     isFlinging = not isFlinging
     
+    local char = plr.Character
+    local root = getRoot(char)
+
     if isFlinging then
-        local char = plr.Character
-        local root = getRoot(char)
-        
         if not char or not root then
             btn.Text = "No Character!"
             isFlinging = false
@@ -164,35 +181,48 @@ btn.MouseButton1Click:Connect(function()
         end
         
         btn.Text = "Status: ON (Active)"
-        btnStroke.Color = Color3.fromRGB(0, 255, 100) -- Đổi viền nút sang xanh lá
+        btnStroke.Color = Color3.fromRGB(0, 255, 100)
         
-        -- Kích hoạt hiệu ứng neon phát sáng trên cơ thể
+        -- Kích hoạt hiệu ứng neon & Tắt va chạm cơ thể
         toggleNeonVisual(char, root, true)
+        toggleCollision(char, true)
         
-        -- Vòng lặp tối ưu hóa cho máy yếu
+        -- Vòng lặp fling
         flingConn = RunService.Heartbeat:Connect(function()
-            if not char.Parent or not root.Parent or not isFlinging then 
+            -- Kiểm tra lại character liên tục trong trường hợp player reset
+            local currentTargetChar = plr.Character
+            local currentRoot = getRoot(currentTargetChar)
+            
+            if not currentTargetChar or not currentRoot or not isFlinging then 
                 return 
             end
             
-            local lastVel = root.AssemblyLinearVelocity
-            root.AssemblyLinearVelocity = Vector3.new(500000, 250000, 500000)
+            -- Đảm bảo mỗi khi hồi sinh hoặc đổi trạng thái vẫn giữ tắt va chạm
+            for _, part in ipairs(currentTargetChar:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+            
+            local lastVel = currentRoot.AssemblyLinearVelocity
+            currentRoot.AssemblyLinearVelocity = Vector3.new(500000, 250000, 500000)
             
             RunService.RenderStepped:Wait()
-            if root and root.Parent then
-                root.AssemblyLinearVelocity = lastVel
+            if currentRoot and currentRoot.Parent then
+                currentRoot.AssemblyLinearVelocity = lastVel
             end
         end)
     else
         btn.Text = "Status: OFF"
-        btnStroke.Color = Color3.fromRGB(255, 50, 50) -- Đổi viền nút về đỏ
-        
-        -- Tắt hiệu ứng neon trên cơ thể
-        toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+        btnStroke.Color = Color3.fromRGB(255, 50, 50)
         
         if flingConn then
             flingConn:Disconnect()
             flingConn = nil
         end
+        
+        -- Tắt hiệu ứng neon & Bật lại va chạm cơ thể bình thường
+        toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+        toggleCollision(plr.Character, false)
     end
 end)
