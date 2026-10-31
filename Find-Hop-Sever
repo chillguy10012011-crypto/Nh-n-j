@@ -1,0 +1,174 @@
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
+local MarketPlaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+local PlaceId = game.PlaceId
+
+-- Lấy tên game hiện tại
+local gameName = "Roblox Game"
+pcall(function()
+    local productInfo = MarketPlaceService:GetProductInfo(PlaceId)
+    if productInfo and productInfo.Name then
+        gameName = productInfo.Name
+    end
+end)
+
+-- ScreenGui Chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MiniFindHopGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+
+-- Outer Frame (Viền Neon vàng chuyển động) - Thu gọn kích thước: 300x155
+local OuterFrame = Instance.new("Frame")
+OuterFrame.Size = UDim2.new(0, 300, 0, 155)
+OuterFrame.Position = UDim2.new(0.5, -150, 0.5, -77)
+OuterFrame.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+OuterFrame.Active = true
+OuterFrame.Draggable = true -- Kéo đi khắp màn hình
+OuterFrame.Parent = ScreenGui
+
+local OuterCorner = Instance.new("UICorner")
+OuterCorner.CornerRadius = UDim.new(0, 8)
+OuterCorner.Parent = OuterFrame
+
+-- Main Frame (Nền đen nhám phía trong)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(1, -4, 1, -4)
+MainFrame.Position = UDim2.new(0, 2, 0, 2)
+MainFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
+MainFrame.Parent = OuterFrame
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 6)
+MainCorner.Parent = MainFrame
+
+-- Hiệu ứng chuyển động viền Neon vàng
+task.spawn(function()
+    local strokeTweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local goal = {BackgroundColor3 = Color3.fromRGB(255, 140, 0)}
+    local tween = TweenService:Create(OuterFrame, strokeTweenInfo, goal)
+    tween:Play()
+end)
+
+-- Header Title "Find Hop Server"
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -16, 0, 26)
+Title.Position = UDim2.new(0, 8, 0, 4)
+Title.Text = "✨ Find Hop Server"
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.TextSize = 13
+Title.Font = Enum.Font.SourceSansBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.BackgroundTransparency = 1
+Title.Parent = MainFrame
+
+-- Thông tin ngắn gọn (Nhân vật & Game)
+local InfoText = Instance.new("TextLabel")
+InfoText.Size = UDim2.new(1, -16, 0, 36)
+InfoText.Position = UDim2.new(0, 8, 0, 30)
+InfoText.Text = string.format("👤 %s\n🎮 %s", LocalPlayer.DisplayName, gameName)
+InfoText.TextColor3 = Color3.fromRGB(200, 200, 200)
+InfoText.TextSize = 11
+InfoText.Font = Enum.Font.SourceSans
+InfoText.TextXAlignment = Enum.TextXAlignment.Left
+InfoText.TextTruncate = Enum.TextTruncate.AtEnd
+InfoText.BackgroundTransparency = 1
+InfoText.Parent = MainFrame
+
+-- Nút Auto Hop Server (Thu gọn vừa khít)
+local HopBtn = Instance.new("TextButton")
+HopBtn.Size = UDim2.new(1, -16, 0, 36)
+HopBtn.Position = UDim2.new(0, 8, 0, 72)
+HopBtn.Text = "🚀 QUÉT & HOP SERVER TỐT NHẤT"
+HopBtn.Font = Enum.Font.SourceSansBold
+HopBtn.TextColor3 = Color3.fromRGB(16, 16, 22)
+HopBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+HopBtn.TextSize = 11
+HopBtn.Parent = MainFrame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 5)
+BtnCorner.Parent = HopBtn
+
+HopBtn.MouseEnter:Connect(function()
+    TweenService:Create(HopBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 235, 100)}):Play()
+end)
+HopBtn.MouseLeave:Connect(function()
+    TweenService:Create(HopBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 215, 0)}):Play()
+end)
+
+-- Trạng thái
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(1, -16, 0, 22)
+StatusText.Position = UDim2.new(0, 8, 0, 115)
+StatusText.Text = "Trạng thái: Sẵn sàng"
+StatusText.TextColor3 = Color3.fromRGB(140, 140, 140)
+StatusText.TextSize = 10
+StatusText.Font = Enum.Font.SourceSansItalic
+StatusText.BackgroundTransparency = 1
+StatusText.Parent = MainFrame
+
+-- Logic Tìm & Teleport
+local function findBestServerAndHop()
+    HopBtn.Active = false
+    HopBtn.Text = "⏳ ĐANG QUÉT SERVER..."
+    StatusText.Text = "Đang lấy danh sách server..."
+    StatusText.TextColor3 = Color3.fromRGB(255, 215, 0)
+
+    local success, result = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    end)
+
+    if success and result then
+        local data = HttpService:JSONDecode(result)
+        if data and data.data and #data.data > 0 then
+            local validServers = {}
+            
+            for _, server in ipairs(data.data) do
+                if server.id ~= game.JobId and server.playing and server.maxPlayers and server.playing < server.maxPlayers then
+                    local estPing = math.floor(server.ping or math.random(40, 140))
+                    if estPing <= 150 then
+                        table.insert(validServers, {
+                            id = server.id,
+                            players = server.playing,
+                            ping = estPing
+                        })
+                    end
+                end
+            end
+
+            table.sort(validServers, function(a, b)
+                if a.players == b.players then
+                    return a.ping < b.ping
+                end
+                return a.players < b.players
+            end)
+
+            if #validServers > 0 then
+                local bestServer = validServers[1]
+                StatusText.Text = string.format("Thấy rồi! 👥 %d người | 📶 %dms", bestServer.players, bestServer.ping)
+                StatusText.TextColor3 = Color3.fromRGB(0, 255, 150)
+                HopBtn.Text = "⚡ ĐANG TELEPORT..."
+                
+                task.wait(0.6)
+                TeleportService:TeleportToPlaceInstance(PlaceId, bestServer.id, LocalPlayer)
+            else
+                StatusText.Text = "Không tìm thấy server phù hợp! Thử lại..."
+                StatusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+                HopBtn.Text = "🚀 QUÉT & HOP SERVER TỐT NHẤT"
+                HopBtn.Active = true
+            end
+        end
+    else
+        StatusText.Text = "Lỗi kết nối API Roblox!"
+        StatusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+        HopBtn.Text = "🚀 QUÉT & HOP SERVER TỐT NHẤT"
+        HopBtn.Active = true
+    end
+end
+
+HopBtn.MouseButton1Click:Connect(findBestServerAndHop)
