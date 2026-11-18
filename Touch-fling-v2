@@ -1,3 +1,195 @@
+-- Phần 1: Khởi tạo Giao diện, Danh sách Người chơi & Trạng thái Hệ thống
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local plr = Players.LocalPlayer
+local gui = plr:WaitForChild("PlayerGui")
+
+-- Xóa GUI cũ nếu có để tránh bị đè
+if gui:FindFirstChild("LiteNeonFling") then
+    gui.LiteNeonFling:Destroy()
+end
+
+-- Tạo ScreenGui chính
+local sc = Instance.new("ScreenGui")
+sc.Name = "LiteNeonFling"
+sc.ResetOnSpawn = false
+sc.Parent = gui
+
+-- Khung chính (Main Frame) - Phóng to bề rộng ra 280px để thoáng bố cục
+local frm = Instance.new("Frame")
+frm.Size = UDim2.new(0, 280, 0, 310)
+frm.Position = UDim2.new(0.5, -140, 0.5, -155)
+frm.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frm.Active = true
+frm.Draggable = true
+frm.Parent = sc
+
+Instance.new("UICorner", frm).CornerRadius = UDim.new(0, 8)
+
+-- Viền Neon cho Khung chính
+local frmStroke = Instance.new("UIStroke")
+frmStroke.Color = Color3.fromRGB(0, 255, 100)
+frmStroke.Thickness = 2
+frmStroke.Parent = frm
+
+-- Thanh tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.TextColor3 = Color3.fromRGB(0, 255, 100)
+title.Text = "  Lite Fling Hub + Neon & TP"
+title.TextSize = 13
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frm
+
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+
+-- Nút Xóa GUI (X)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -27, 0, 3)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "X"
+closeBtn.TextSize = 11
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = title
+
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút Thu gọn (-)
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 24, 0, 24)
+minBtn.Position = UDim2.new(1, -55, 0, 3)
+minBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Text = "-"
+minBtn.TextSize = 14
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = title
+
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút Bật/Tắt Fling chính
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -16, 0, 32)
+btn.Position = UDim2.new(0, 8, 0, 36)
+btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Text = "Status: OFF"
+btn.TextSize = 13
+btn.Font = Enum.Font.GothamBold
+btn.Parent = frm
+
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(255, 50, 50) 
+btnStroke.Thickness = 2
+btnStroke.Parent = btn
+
+-- Khu vực cài đặt cấu hình Target TP (Khoảng cách, Trước/Sau, Thời gian)
+local configFrame = Instance.new("Frame")
+configFrame.Size = UDim2.new(1, -16, 0, 55)
+configFrame.Position = UDim2.new(0, 8, 0, 74)
+configFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+configFrame.Parent = frm
+Instance.new("UICorner", configFrame).CornerRadius = UDim.new(0, 6)
+
+-- Ô chỉnh khoảng cách (Studs)
+local distBox = Instance.new("TextBox")
+distBox.Size = UDim2.new(0, 75, 0, 22)
+distBox.Position = UDim2.new(0, 5, 0, 4)
+distBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+distBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+distBox.Text = "2"
+distBox.PlaceholderText = "Khoảng cách"
+distBox.TextSize = 11
+distBox.Font = Enum.Font.Gotham
+distBox.Parent = configFrame
+Instance.new("UICorner", distBox).CornerRadius = UDim.new(0, 4)
+
+-- Nút chỉnh loại Trước / Sau
+local sideBtn = Instance.new("TextButton")
+sideBtn.Size = UDim2.new(0, 75, 0, 22)
+sideBtn.Position = UDim2.new(0, 85, 0, 4)
+sideBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+sideBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
+sideBtn.Text = "Loại: Trước"
+sideBtn.TextSize = 11
+sideBtn.Font = Enum.Font.GothamBold
+sideBtn.Parent = configFrame
+Instance.new("UICorner", sideBtn).CornerRadius = UDim.new(0, 4)
+
+-- Ô chỉnh thời gian (Giây) dành cho chế độ 2
+local timeBox = Instance.new("TextBox")
+timeBox.Size = UDim2.new(0, 92, 0, 22)
+timeBox.Position = UDim2.new(0, 165, 0, 4)
+timeBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+timeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+timeBox.Text = "1"
+timeBox.PlaceholderText = "Thời gian (s)"
+timeBox.TextSize = 11
+timeBox.Font = Enum.Font.Gotham
+timeBox.Parent = configFrame
+Instance.new("UICorner", timeBox).CornerRadius = UDim.new(0, 4)
+
+-- Nút Chuyển Chế độ (Chế độ 1 / Chế độ 2)
+local modeBtn = Instance.new("TextButton")
+modeBtn.Size = UDim2.new(0, 125, 0, 22)
+modeBtn.Position = UDim2.new(0, 5, 0, 29)
+modeBtn.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+modeBtn.Text = "Chế độ: 1 (Đơn)"
+modeBtn.TextSize = 11
+modeBtn.Font = Enum.Font.GothamBold
+modeBtn.Parent = configFrame
+Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút White list / Black list (Chỉ hiện ở Chế độ 2)
+local listTypeBtn = Instance.new("TextButton")
+listTypeBtn.Size = UDim2.new(0, 125, 0, 22)
+listTypeBtn.Position = UDim2.new(0, 133, 0, 29)
+listTypeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+listTypeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+listTypeBtn.Text = "Loại: White list"
+listTypeBtn.TextSize = 11
+listTypeBtn.Font = Enum.Font.GothamBold
+listTypeBtn.Visible = hidden
+listTypeBtn.Visible = false
+listTypeBtn.Parent = configFrame
+Instance.new("UICorner", listTypeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Khung chứa danh sách người chơi (ScrollingFrame)
+local playerScroll = Instance.new("ScrollingFrame")
+playerScroll.Size = UDim2.new(1, -16, 0, 110)
+playerScroll.Position = UDim2.new(0, 8, 0, 133)
+playerScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+playerScroll.BorderSizePixel = 0
+playerScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerScroll.ScrollBarThickness = 4
+playerScroll.Parent = frm
+Instance.new("UICorner", playerScroll).CornerRadius = Instance.new("UICorner", playerScroll) and UDim.new(0, 6)
+local uiListLayout = Instance.new("UIListLayout", playerScroll)
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 3)
+
+-- Nút Bật/Tắt Target Teleport
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(1, -16, 0, 28)
+tpBtn.Position = UDim2.new(0, 8, 0, 248)
+tpBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.Text = "Target TP: OFF"
+tpBtn.TextSize = 12
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.Parent = frm
+Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+local tpStroke = Instance.new("UIStroke")
+tpStroke.Color = Color3.fromRGB(255, 50, 50)
+tpStroke.Thickness = 2
+tpStroke.Parent = tpBtn
 -- Phần 2: Logic Xử lý (Fling, Ghi nhớ Chế độ, Target TP & Giao diện Player)
 local isFlinging = false
 local flingConn = nil
