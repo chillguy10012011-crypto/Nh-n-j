@@ -1,0 +1,298 @@
+-- Phần 2: Logic Xử lý (Fling, Ghi nhớ Chế độ, Target TP & Giao diện Player)
+local isFlinging = false
+local flingConn = nil
+local isMinimized = false
+local neonBox = nil
+
+-- Biến logic quản lý Target & Chế độ đã được yêu cầu ghi nhớ độc lập
+local currentMode = 1 -- 1: Đơn (chọn 1 người), 2: Đa (chọn nhiều người)
+local listType = "White" -- "White" hoặc "Black"
+local targetType = "Trước" -- "Trước" hoặc "Sau"
+
+-- Lưu trữ danh sách đã chọn riêng biệt cho từng chế độ để ghi nhớ
+local selectedMode1 = nil -- Lưu 1 Instance Player
+local selectedMode2 = {}  -- Lưu Table chứa các Player
+
+local isTPRunning = false
+local tpConn = nil
+
+local function getRoot(char)
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+end
+
+-- Hàm hiệu ứng Neon & Tắt va chạm
+local function toggleNeonVisual(char, root, state)
+    if state then
+        if char and root and not char:FindFirstChild("NeonFlingVisual") then
+            neonBox = Instance.new("SelectionBox")
+            neonBox.Name = "NeonFlingVisual"
+            neonBox.Adornee = root
+            neonBox.Color3 = Color3.fromRGB(0, 255, 100)
+            neonBox.LineThickness = 0.05
+            neonBox.SurfaceColor3 = Color3.fromRGB(0, 255, 100)
+            neonBox.SurfaceTransparency = 0.8
+            neonBox.Parent = char
+        end
+    else
+        if neonBox then neonBox:Destroy(); neonBox = nil end
+        if char then
+            local oldVisual = char:FindFirstChild("NeonFlingVisual")
+            if oldVisual then oldVisual:Destroy() end
+        end
+    end
+end
+
+local function toggleCollision(char, state)
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not state -- state true nghĩa là noclip (CanCollide = false)
+        end
+    end
+end
+
+-- Cập nhật và vẽ lại danh sách người chơi trong ScrollingFrame
+local function updatePlayerList()
+    -- Xóa các item cũ
+    for _, child in ipairs(playerScroll:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    local allPlayers = Players:GetPlayers()
+    for _, p in ipairs(allPlayers) do
+        if p ~= plr then
+            local pBtn = Instance.new("TextButton")
+            pBtn.Size = UDim2.new(1, -4, 0, 26)
+            pBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            pBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+            pBtn.TextSize = 11
+            pBtn.Font = Enum.Font.Gotham
+            pBtn.TextXAlignment = Enum.TextXAlignment.Left
+            pBtn.Parent = playerScroll
+            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
+
+            -- Kiểm tra xem người chơi này có đang được chọn ở chế độ hiện tại không
+            local isSelected = false
+            if currentMode == 1 then
+                if selectedMode1 == p then isSelected = true end
+            else
+                if selectedMode2[p] then isSelected = true end
+            end
+
+            local checkMark = isSelected and " [✓] " or " [   ] "
+            local displayName = p.DisplayName or p.Name
+            pBtn.Text = "  " .. displayName .. " (@" .. p.Name .. ")" .. checkMark
+
+            if isSelected then
+                pBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 50)
+            end
+
+            -- Sự kiện click chọn người chơi
+            pBtn.MouseButton1Click:Connect(function()
+                if currentMode == 1 then
+                    if selectedMode1 == p then
+                        selectedMode1 = nil
+                    else
+                        selectedMode1 = p
+                    end
+                else
+                    if selectedMode2[p] then
+                        selectedMode2[p] = nil
+                    else
+                        selectedMode2[p] = p
+                    end
+                end
+                updatePlayerList()
+            end)
+        end
+    end
+    playerScroll.CanvasSize = UDim2.new(0, 0, 0, #allPlayers * 29)
+end
+
+-- Chuyển đổi chế độ 1 <-> 2
+modeBtn.MouseButton1Click:Connect(function()
+    if currentMode == 1 then
+        currentMode = 2
+        modeBtn.Text = "Chế độ: 2 (Đa)"
+        listTypeBtn.Visible = true
+    else
+        currentMode = 1
+        modeBtn.Text = "Chế độ: 1 (Đơn)"
+        listTypeBtn.Visible = false
+    end
+    updatePlayerList()
+end)
+
+-- Chuyển đổi White list / Black list
+listTypeBtn.MouseButton1Click:Connect(function()
+    if listType == "White" then
+        listType = "Black"
+        listTypeBtn.Text = "Loại: Black list"
+        listTypeBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+    else
+        listType = "White"
+        listTypeBtn.Text = "Loại: White list"
+        listTypeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+    end
+end)
+
+-- Chuyển đổi loại Trước / Sau
+sideBtn.MouseButton1Click:Connect(function()
+    if targetType == "Trước" then
+        targetType = "Sau"
+        sideBtn.Text = "Loại: Sau"
+    else
+        targetType = "Trước"
+        sideBtn.Text = "Loại: Trước"
+    end
+end)
+
+-- Nút Thu gọn (-) / Mở rộng (+)
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        minBtn.Text = "+"
+        configFrame.Visible = false
+        playerScroll.Visible = false
+        tpBtn.Visible = false
+        btn.Visible = false
+        frm.Size = UDim2.new(0, 280, 0, 30)
+    else
+        minBtn.Text = "-"
+        configFrame.Visible = true
+        playerScroll.Visible = true
+        tpBtn.Visible = true
+        btn.Visible = true
+        frm.Size = UDim2.new(0, 280, 0, 310)
+    end
+end)
+
+-- Nút Đóng (X)
+closeBtn.MouseButton1Click:Connect(function()
+    if flingConn then flingConn:Disconnect() end
+    if tpConn then tpConn:Disconnect() end
+    toggleCollision(plr.Character, false)
+    toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+    sc:Destroy()
+end)
+
+-- Nút Bật/Tắt Fling chính
+btn.MouseButton1Click:Connect(function()
+    isFlinging = not isFlinging
+    local char = plr.Character
+    local root = getRoot(char)
+
+    if isFlinging then
+        if not char or not root then
+            btn.Text = "No Character!"
+            isFlinging = false
+            return
+        end
+        btn.Text = "Fling: ON (Active)"
+        btnStroke.Color = Color3.fromRGB(0, 255, 100)
+        
+        toggleNeonVisual(char, root, true)
+        toggleCollision(char, true)
+        
+        flingConn = RunService.Heartbeat:Connect(function()
+            local currChar = plr.Character
+            local currRoot = getRoot(currChar)
+            if not currChar or not currRoot or not isFlinging then return end
+            
+            for _, part in ipairs(currChar:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+            
+            local lastVel = currRoot.AssemblyLinearVelocity
+            currRoot.AssemblyLinearVelocity = Vector3.new(500000, 250000, 500000)
+            RunService.RenderStepped:Wait()
+            if currRoot and currRoot.Parent then
+                currRoot.AssemblyLinearVelocity = lastVel
+            end
+        end)
+    else
+        btn.Text = "Status: OFF"
+        btnStroke.Color = Color3.fromRGB(255, 50, 50)
+        if flingConn then flingConn:Disconnect(); flingConn = nil end
+        toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+        toggleCollision(plr.Character, false)
+    end
+end)
+
+-- Logic Xử lý Target Teleport
+tpBtn.MouseButton1Click:Connect(function()
+    isTPRunning = not isTPRunning
+    if isTPRunning then
+        tpBtn.Text = "Target TP: ON"
+        tpStroke.Color = Color3.fromRGB(0, 255, 100)
+        
+        task.spawn(function()
+            while isTPRunning do
+                local char = plr.Character
+                local root = getRoot(char)
+                local dist = tonumber(distBox.Text) or 2
+                local delayTime = tonumber(timeBox.Text) or 1
+
+                if char and root then
+                    if currentMode == 1 then
+                        -- Chế độ 1: Teleport đến 1 người chơi được chọn duy nhất
+                        if selectedMode1 and selectedMode1.Character then
+                            local targetRoot = getRoot(selectedMode1.Character)
+                            if targetRoot then
+                                local offset = (targetType == "Trước") and (targetRoot.CFrame.LookVector * dist) or (-targetRoot.CFrame.LookVector * dist)
+                                root.CFrame = targetRoot.CFrame + offset
+                            end
+                        end
+                        task.wait(0.1)
+                    else
+                        -- Chế độ 2: Xoay vòng target giữa các người chơi theo thời gian chỉnh
+                        local targetsToTP = {}
+                        if listType == "White" then
+                            for _, p in pairs(selectedMode2) do
+                                table.insert(targetsToTP, p)
+                            end
+                        else -- Black list (target tất cả trừ những người trong danh sách)
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p ~= plr and not selectedMode2[p] then
+                                    table.insert(targetsToTP, p)
+                                end
+                            end
+                        end
+
+                        if #targetsToTP > 0 then
+                            for _, targetP in ipairs(targetsToTP) do
+                                if not isTPRunning then break end
+                                if targetP and targetP.Character then
+                                    local targetRoot = getRoot(targetP.Character)
+                                    if targetRoot then
+                                        local offset = (targetType == "Trước") and (targetRoot.CFrame.LookVector * dist) or (-targetRoot.CFrame.LookVector * dist)
+                                        root.CFrame = targetRoot.CFrame + offset
+                                    end
+                                end
+                                task.wait(delayTime)
+                            end
+                        else
+                            task.wait(0.5)
+                        end
+                    end
+                else
+                    task.wait(0.5)
+                end
+            end
+        end)
+    else
+        tpBtn.Text = "Target TP: OFF"
+        tpStroke.Color = Color3.fromRGB(255, 50, 50)
+        isTPRunning = false
+    end
+end)
+
+-- Tự động cập nhật danh sách khi người chơi vào hoặc rời game
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+updatePlayerList()
