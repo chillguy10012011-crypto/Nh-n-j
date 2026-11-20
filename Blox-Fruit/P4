@@ -1,0 +1,719 @@
+-- [[ EZHUB V1 - PART 4/4: POTATO GRAPHICS, ANTI-AFK, SERVER HOP/RECONNECT & NEON GUI ]] --
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
+
+local LocalPlayer = Players.LocalPlayer
+local HOP_RESTORE_FILE = "EzhubV1/hop_restore_state.json"
+
+local function attachPerfServerAndGui(EzhubCore, Gameplay, DragonBelt)
+	local PerfAndGui = {}
+
+	-- Lưu snapshot gốc của đồ họa để có thể khôi phục khi bấm nút khôi phục hiệu ứng
+	local SavedLightingState = {
+		GlobalShadows = Lighting.GlobalShadows,
+		FogEnd = Lighting.FogEnd,
+		FogStart = Lighting.FogStart,
+		Brightness = Lighting.Brightness,
+		EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+		EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+		Captured = false,
+	}
+	local HiddenEffectInstances = {} -- { [Instance] = { Enabled = bool } }
+
+	local function captureOriginalGraphicsOnce()
+		if SavedLightingState.Captured then
+			return
+		end
+		SavedLightingState.GlobalShadows = Lighting.GlobalShadows
+		SavedLightingState.FogEnd = Lighting.FogEnd
+		SavedLightingState.FogStart = Lighting.FogStart
+		SavedLightingState.Brightness = Lighting.Brightness
+		SavedLightingState.EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale
+		SavedLightingState.EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale
+		SavedLightingState.Captured = true
+	end
+
+	local function isSeaEventHeavy()
+		local eventScore = 0
+		for _, obj in ipairs(Workspace:GetChildren()) do
+			local lower = string.lower(obj.Name)
+			if string.find(lower, "event", 1, true)
+				or string.find(lower, "sea", 1, true)
+				or string.find(lower, "ship", 1, true)
+				or string.find(lower, "terror", 1, true)
+				or string.find(lower, "leviathan", 1, true)
+				or string.find(lower, "dragon", 1, true)
+			then
+				eventScore += 1
+			end
+		end
+		local particleCount = 0
+		for _, desc in ipairs(Workspace:GetDescendants()) do
+			if desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Beam") then
+				particleCount += 1
+				if particleCount > 180 then
+					break
+				end
+			end
+		end
+		return (eventScore >= 2) or (particleCount >= 140)
+	end
+
+	function PerfAndGui.ApplyPotatoGraphics(heavyEventMode)
+		captureOriginalGraphicsOnce()
+		EzhubCore.Config.PotatoGraphics = true
+		EzhubCore.Config.RestoreEffectsRequested = false
+
+		pcall(function()
+			Lighting.GlobalShadows = false
+			Lighting.FogEnd = heavyEventMode and 450 or 900
+			Lighting.FogStart = 120
+			Lighting.Brightness = 1
+			Lighting.EnvironmentSpecularScale = 0
+			Lighting.EnvironmentDiffuseScale = 0
+		end)
+
+		local isCharDescendant = function(inst)
+			local char = LocalPlayer.Character
+			return char and inst:IsDescendantOf(char)
+		end
+
+		for _, desc in ipairs(Workspace:GetDescendants()) do
+			if not isCharDescendant(desc) then
+				if desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Beam") or desc:IsA("Fire") or desc:IsA("Smoke") or desc:IsA("Sparkles") then
+					if HiddenEffectInstances[desc] == nil then
+						HiddenEffectInstances[desc] = { Enabled = desc.Enabled }
+					end
+					pcall(function()
+						desc.Enabled = false
+					end)
+				elseif heavyEventMode and (desc:IsA("Decal") or desc:IsA("Texture")) then
+					if HiddenEffectInstances[desc] == nil then
+						HiddenEffectInstances[desc] = { Enabled = desc.Transparency }
+					end
+					pcall(function()
+						desc.Transparency = 1
+					end)
+				elseif heavyEventMode and desc:IsA("BasePart") then
+					pcall(function()
+						desc.Material = Enum.Material.SmoothPlastic
+						desc.CastShadow = false
+					end)
+				end
+			end
+		end
+
+		if heavyEventMode then
+			EzhubCore.Notify("Potato GFX", "Vùng biển đông sự kiện — Đã tự kích hoạt giảm tải nặng.")
+		else
+			EzhubCore.Notify("Potato GFX", "Đã bật chế độ đồ họa khoai tây tối ưu FPS.")
+		end
+	end
+
+	-- Nút khôi phục / bật lại hiệu ứng hiển thị khi cần quan sát rõ
+	function PerfAndGui.RestoreVisualEffects()
+		captureOriginalGraphicsOnce()
+		EzhubCore.Config.RestoreEffectsRequested = true
+		EzhubCore.Config.PotatoGraphics = false
+
+		pcall(function()
+			Lighting.GlobalShadows = SavedLightingState.GlobalShadows
+			Lighting.FogEnd = SavedLightingState.FogEnd
+			Lighting.FogStart = SavedLightingState.FogStart
+			Lighting.Brightness = SavedLightingState.Brightness
+			Lighting.EnvironmentSpecularScale = SavedLightingState.EnvironmentSpecularScale
+			Lighting.EnvironmentDiffuseScale = SavedLightingState.EnvironmentDiffuseScale
+		end)
+
+		for inst, prev in pairs(HiddenEffectInstances) do
+			if inst and inst.Parent then
+				pcall(function()
+					if typeof(prev.Enabled) == "boolean" then
+						inst.Enabled = prev.Enabled
+					elseif typeof(prev.Enabled) == "number" then
+						inst.Transparency = prev.Enabled
+					end
+				end)
+			end
+			HiddenEffectInstances[inst] = nil
+		end
+
+		EzhubCore.SaveConfig()
+		EzhubCore.Notify("Visuals", "Đã khôi phục hiệu ứng hiển thị để quan sát rõ hơn.")
+	end
+
+	-- Luồng đồ họa khoai tây & tự giảm tải vùng biển nhiều sự kiện
+	EzhubCore.RegisterThread("PotatoGraphicsLoop", function(isAlive)
+		if EzhubCore.Config.RestoreEffectsRequested and not EzhubCore.Config.PotatoGraphics then
+			task.wait(0.5)
+			return
+		end
+
+		local heavySea = EzhubCore.Config.AutoHeavyCullInEventSea and isSeaEventHeavy()
+		if EzhubCore.Config.PotatoGraphics or heavySea then
+			PerfAndGui.ApplyPotatoGraphics(heavySea)
+		end
+
+		task.wait(2.5)
+	end)
+
+	-- =========================================================================
+	-- CHỐNG AFK (ANTI-AFK)
+	-- =========================================================================
+	LocalPlayer.Idled:Connect(function()
+		if EzhubCore.Config.AntiAfk and not EzhubCore.Config.EmergencyStopAll then
+			pcall(function()
+				VirtualUser:CaptureController()
+				VirtualUser:ClickButton2(Vector2.new(0, 0))
+			end)
+			EzhubCore.Notify("Anti-AFK", "Đã chặn tự động ngắt kết nối khi treo máy.")
+		end
+	end)
+
+	-- =========================================================================
+	-- SERVER HOP (TRÁNH LẶP SERVER CŨ & TỰ BẬT LẠI CẤU HÌNH) + AUTO RECONNECT
+	-- =========================================================================
+	local function saveHopRestoreSnapshot()
+		if not (typeof(writefile) == "function" and typeof(isfolder) == "function" and typeof(makefolder) == "function") then
+			return
+		end
+		local activeSnapshot = {}
+		for k, v in pairs(EzhubCore.Config) do
+			if type(v) == "boolean" then
+				activeSnapshot[k] = v
+			end
+		end
+		pcall(function()
+			if not isfolder("EzhubV1") then
+				makefolder("EzhubV1")
+			end
+			writefile(HOP_RESTORE_FILE, HttpService:JSONEncode(activeSnapshot))
+		end)
+	end
+
+	function PerfAndGui.ApplyPostHopConfigIfNeeded()
+		if not EzhubCore.Config.AutoRestoreModesAfterHop then
+			return
+		end
+		if typeof(isfile) == "function" and typeof(readfile) == "function" and isfile(HOP_RESTORE_FILE) then
+			local ok, snap = pcall(function()
+				return HttpService:JSONDecode(readfile(HOP_RESTORE_FILE))
+			end)
+			if ok and type(snap) == "table" then
+				for k, v in pairs(snap) do
+					if type(v) == "boolean" and EzhubCore.DefaultConfig[k] ~= nil then
+						EzhubCore.Config[k] = v
+					end
+				end
+				EzhubCore.Config.EmergencyStopAll = false
+				EzhubCore.Notify("Server Hop", "Đã tự động bật lại các cấu hình đã chọn trước đó.")
+			end
+		end
+	end
+
+	function PerfAndGui.HopToLowPopulationServer()
+		EzhubCore.MarkCurrentServerVisited()
+		saveHopRestoreSnapshot()
+		EzhubCore.Notify("Server Hop", "Đang tìm server ít người và chưa ghé qua...")
+
+		local cursor = ""
+		local chosenJobId = nil
+		local lowestPlayers = math.huge
+
+		for _ = 1, 5 do
+			local url = string.format(
+				"https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100%s",
+				game.PlaceId,
+				cursor ~= "" and ("&cursor=" .. cursor) or ""
+			)
+			local ok, raw = pcall(function()
+				return game:HttpGet(url)
+			end)
+			if not ok or not raw then
+				break
+			end
+			local parsed = HttpService:JSONDecode(raw)
+			if parsed and type(parsed.data) == "table" then
+				for _, srv in ipairs(parsed.data) do
+					local jobId = tostring(srv.id or "")
+					local playing = tonumber(srv.playing) or 0
+					local maxPlayers = tonumber(srv.maxPlayers) or 12
+					local alreadyVisited = EzhubCore.Config.AvoidVisitedServers and (EzhubCore.VisitedServers[jobId] ~= nil)
+
+					if jobId ~= ""
+						and jobId ~= tostring(game.JobId)
+						and not alreadyVisited
+						and playing > 0
+						and playing < maxPlayers
+					then
+						if EzhubCore.Config.ServerHopMinPlayers then
+							if playing < lowestPlayers then
+								lowestPlayers = playing
+								chosenJobId = jobId
+							end
+						else
+							chosenJobId = jobId
+							break
+						end
+					end
+				end
+				if chosenJobId and not EzhubCore.Config.ServerHopMinPlayers then
+					break
+				end
+				if parsed.nextPageCursor then
+					cursor = tostring(parsed.nextPageCursor)
+				else
+					break
+				end
+			else
+				break
+			end
+		end
+
+		if chosenJobId then
+			EzhubCore.VisitedServers[chosenJobId] = os.time()
+			EzhubCore.MarkCurrentServerVisited()
+			pcall(function()
+				TeleportService:TeleportToPlaceInstance(game.PlaceId, chosenJobId, LocalPlayer)
+			end)
+		else
+			EzhubCore.Notify("Server Hop", "Không tìm thấy server mới phù hợp — Đang thử kết nối lại.")
+			pcall(function()
+				TeleportService:Teleport(game.PlaceId, LocalPlayer)
+			end)
+		end
+	end
+
+	-- Tự động vào lại game khi mất mạng / bị ngắt kết nối (Auto Reconnect)
+	GuiService.ErrorMessageChanged:Connect(function()
+		if EzhubCore.Config.AutoReconnect then
+			EzhubCore.MarkCurrentServerVisited()
+			saveHopRestoreSnapshot()
+			EzhubCore.Notify("Reconnect", "Phát hiện mất kết nối — Đang tự động vào lại game...")
+			task.wait(2)
+			pcall(function()
+				TeleportService:Teleport(game.PlaceId, LocalPlayer)
+			end)
+		end
+	end)
+
+	PerfAndGui.ApplyPostHopConfigIfNeeded()
+
+	-- =========================================================================
+	-- GIAO DIỆN GUI NỀN TỐI VIỀN NEON BO GÓC KÉO THẢ (- / X / TOGGLE NHANH)
+	-- =========================================================================
+	local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+	local existingGui = playerGui:FindFirstChild("EzhubV1_ScreenGui")
+	if existingGui then
+		existingGui:Destroy()
+	end
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "EzhubV1_ScreenGui"
+	screenGui.ResetOnSpawn = false
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	screenGui.Parent = playerGui
+
+	-- Nút bật/tắt nhanh giao diện luôn sẵn sàng trên màn hình
+	local quickToggleBtn = Instance.new("TextButton")
+	quickToggleBtn.Name = "QuickToggleGui"
+	quickToggleBtn.Size = UDim2.fromOffset(118, 34)
+	quickToggleBtn.Position = UDim2.new(0, 14, 0.5, -17)
+	quickToggleBtn.BackgroundColor3 = Color3.fromRGB(13, 16, 26)
+	quickToggleBtn.TextColor3 = Color3.fromRGB(0, 245, 212)
+	quickToggleBtn.Font = Enum.Font.GothamBold
+	quickToggleBtn.TextSize = 12
+	quickToggleBtn.Text = "EZHUB V1"
+	quickToggleBtn.Parent = screenGui
+
+	local quickCorner = Instance.new("UICorner")
+	quickCorner.CornerRadius = UDim.new(0, 10)
+	quickCorner.Parent = quickToggleBtn
+
+	local quickStroke = Instance.new("UIStroke")
+	quickStroke.Color = Color3.fromRGB(0, 245, 212)
+	quickStroke.Thickness = 1.6
+	quickStroke.Parent = quickToggleBtn
+
+	-- Khung chính nền tối viền neon bo góc
+	local mainFrame = Instance.new("Frame")
+	mainFrame.Name = "MainFrame"
+	mainFrame.Size = UDim2.fromOffset(560, 380)
+	mainFrame.Position = UDim2.new(0.5, -280, 0.5, -190)
+	mainFrame.BackgroundColor3 = Color3.fromRGB(12, 15, 24)
+	mainFrame.BorderSizePixel = 0
+	mainFrame.Active = true
+	mainFrame.Parent = screenGui
+
+	local mainCorner = Instance.new("UICorner")
+	mainCorner.CornerRadius = UDim.new(0, 14)
+	mainCorner.Parent = mainFrame
+
+	local mainStroke = Instance.new("UIStroke")
+	mainStroke.Thickness = 2
+	mainStroke.Parent = mainFrame
+
+	local neonGrad = Instance.new("UIGradient")
+	neonGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 245, 212)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(72, 149, 239)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(181, 23, 158)),
+	})
+	neonGrad.Parent = mainStroke
+
+	-- Thanh tiêu đề kéo thả + nút thu nhỏ (-) + nút đóng (X)
+	local topBar = Instance.new("Frame")
+	topBar.Name = "TopBar"
+	topBar.Size = UDim2.new(1, 0, 0, 40)
+	topBar.BackgroundColor3 = Color3.fromRGB(18, 22, 35)
+	topBar.BorderSizePixel = 0
+	topBar.Parent = mainFrame
+
+	local topCorner = Instance.new("UICorner")
+	topCorner.CornerRadius = UDim.new(0, 14)
+	topCorner.Parent = topBar
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, -130, 1, 0)
+	titleLabel.Position = UDim2.fromOffset(14, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextSize = 14
+	titleLabel.TextColor3 = Color3.fromRGB(240, 248, 255)
+	titleLabel.Text = "EZHUB V1 — ĐAI 1-8 • ĐẢO RỒNG • DRAGON STORM"
+	titleLabel.Parent = topBar
+
+	local minBtn = Instance.new("TextButton")
+	minBtn.Size = UDim2.fromOffset(30, 26)
+	minBtn.Position = UDim2.new(1, -72, 0.5, -13)
+	minBtn.BackgroundColor3 = Color3.fromRGB(28, 35, 54)
+	minBtn.TextColor3 = Color3.fromRGB(255, 214, 102)
+	minBtn.Font = Enum.Font.GothamBold
+	minBtn.TextSize = 14
+	minBtn.Text = "-"
+	minBtn.Parent = topBar
+	Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 7)
+
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Size = UDim2.fromOffset(30, 26)
+	closeBtn.Position = UDim2.new(1, -36, 0.5, -13)
+	closeBtn.BackgroundColor3 = Color3.fromRGB(58, 20, 32)
+	closeBtn.TextColor3 = Color3.fromRGB(255, 95, 125)
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 13
+	closeBtn.Text = "X"
+	closeBtn.Parent = topBar
+	Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 7)
+
+	-- Kéo thả mượt cho cả MainFrame và QuickToggleBtn
+	local function makeDraggable(dragHandle, targetFrame)
+		local dragging = false
+		local dragStart, startPos
+		dragHandle.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragging = true
+				dragStart = input.Position
+				startPos = targetFrame.Position
+			end
+		end)
+		UserInputService.InputChanged:Connect(function(input)
+			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch) then
+				local delta = input.Position - dragStart
+				targetFrame.Position = UDim2.new(
+					startPos.X.Scale,
+					startPos.X.Offset + delta.X,
+					startPos.Y.Scale,
+					startPos.Y.Offset + delta.Y
+				)
+			end
+		end)
+		UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragging = false
+			end
+		end)
+	end
+
+	makeDraggable(topBar, mainFrame)
+	makeDraggable(quickToggleBtn, quickToggleBtn)
+
+	local isMinimized = false
+	minBtn.MouseButton1Click:Connect(function()
+		isMinimized = not isMinimized
+		mainFrame.Size = isMinimized and UDim2.fromOffset(560, 42) or UDim2.fromOffset(560, 380)
+		for _, child in ipairs(mainFrame:GetChildren()) do
+			if child ~= topBar and not child:IsA("UICorner") and not child:IsA("UIStroke") then
+				child.Visible = not isMinimized
+			end
+		end
+	end)
+
+	closeBtn.MouseButton1Click:Connect(function()
+		mainFrame.Visible = false
+	end)
+
+	quickToggleBtn.MouseButton1Click:Connect(function()
+		mainFrame.Visible = not mainFrame.Visible
+		if mainFrame.Visible and isMinimized then
+			isMinimized = false
+			mainFrame.Size = UDim2.fromOffset(560, 380)
+			for _, child in ipairs(mainFrame:GetChildren()) do
+				if child ~= topBar and not child:IsA("UICorner") and not child:IsA("UIStroke") then
+					child.Visible = true
+				end
+			end
+		end
+	end)
+
+	-- Status Toast / Compact Activity Log gọn nhẹ ở đáy khung chính
+	local statusBar = Instance.new("TextLabel")
+	statusBar.Name = "CompactStatusBar"
+	statusBar.Size = UDim2.new(1, -24, 0, 26)
+	statusBar.Position = UDim2.new(0, 12, 1, -34)
+	statusBar.BackgroundColor3 = Color3.fromRGB(19, 25, 40)
+	statusBar.TextColor3 = Color3.fromRGB(144, 224, 239)
+	statusBar.Font = Enum.Font.Gotham
+	statusBar.TextSize = 11
+	statusBar.TextXAlignment = Enum.TextXAlignment.Left
+	statusBar.TextTruncate = Enum.TextTruncate.AtEnd
+	statusBar.Text = "  [Ready] Ezhub v1 đã sẵn sàng."
+	statusBar.Parent = mainFrame
+	Instance.new("UICorner", statusBar).CornerRadius = UDim.new(0, 7)
+
+	EzhubCore.ToastCallback = function(category, message, timestamp)
+		statusBar.Text = string.format("  [%s][%s] %s", timestamp, category, message)
+	end
+
+	-- Cột Tab bên trái & Khung nội dung bên phải
+	local tabHolder = Instance.new("Frame")
+	tabHolder.Size = UDim2.fromOffset(145, 294)
+	tabHolder.Position = UDim2.fromOffset(12, 48)
+	tabHolder.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+	tabHolder.BorderSizePixel = 0
+	tabHolder.Parent = mainFrame
+	Instance.new("UICorner", tabHolder).CornerRadius = UDim.new(0, 10)
+
+	local tabLayout = Instance.new("UIListLayout")
+	tabLayout.Padding = UDim.new(0, 6)
+	tabLayout.Parent = tabHolder
+
+	local tabPad = Instance.new("UIPadding")
+	tabPad.PaddingTop = UDim.new(0, 8)
+	tabPad.PaddingLeft = UDim.new(0, 8)
+	tabPad.PaddingRight = UDim.new(0, 8)
+	tabPad.Parent = tabHolder
+
+	local pagesContainer = Instance.new("Frame")
+	pagesContainer.Size = UDim2.new(1, -175, 0, 294)
+	pagesContainer.Position = UDim2.fromOffset(165, 48)
+	pagesContainer.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+	pagesContainer.BorderSizePixel = 0
+	pagesContainer.Parent = mainFrame
+	Instance.new("UICorner", pagesContainer).CornerRadius = UDim.new(0, 10)
+
+	local pages = {}
+	local function createPage(name)
+		local sf = Instance.new("ScrollingFrame")
+		sf.Name = name .. "_Page"
+		sf.Size = UDim2.fromScale(1, 1)
+		sf.CanvasSize = UDim2.new(0, 0, 0, 520)
+		sf.ScrollBarThickness = 4
+		sf.BackgroundTransparency = 1
+		sf.Visible = false
+		sf.Parent = pagesContainer
+
+		local list = Instance.new("UIListLayout")
+		list.Padding = UDim.new(0, 7)
+		list.Parent = sf
+
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, 8)
+		pad.PaddingLeft = UDim.new(0, 8)
+		pad.PaddingRight = UDim.new(0, 10)
+		pad.Parent = sf
+
+		pages[name] = sf
+		return sf
+	end
+
+	local function selectPage(name)
+		for pName, page in pairs(pages) do
+			page.Visible = (pName == name)
+		end
+	end
+
+	local function addTabButton(tabText, pageName)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, 0, 0, 32)
+		btn.BackgroundColor3 = Color3.fromRGB(24, 31, 48)
+		btn.TextColor3 = Color3.fromRGB(225, 235, 250)
+		btn.Font = Enum.Font.GothamBold
+		btn.TextSize = 11
+		btn.Text = tabText
+		btn.Parent = tabHolder
+		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+		btn.MouseButton1Click:Connect(function()
+			selectPage(pageName)
+		end)
+	end
+
+	-- Helpers tạo Toggle & Action Button nhanh
+	local function addToggle(parent, labelText, configKey, onChanged)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, 0, 0, 32)
+		btn.Font = Enum.Font.GothamBold
+		btn.TextSize = 11
+		btn.Parent = parent
+		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+		local function refreshVisual()
+			local active = EzhubCore.Config[configKey] == true
+			btn.BackgroundColor3 = active and Color3.fromRGB(0, 95, 90) or Color3.fromRGB(25, 31, 46)
+			btn.TextColor3 = active and Color3.fromRGB(120, 255, 225) or Color3.fromRGB(210, 220, 235)
+			btn.Text = string.format("%s: %s", labelText, active and "BẬT" or "TẮT")
+		end
+
+		refreshVisual()
+		btn.MouseButton1Click:Connect(function()
+			local nextVal = not (EzhubCore.Config[configKey] == true)
+			if nextVal and EzhubCore.Config.EmergencyStopAll then
+				EzhubCore.ResumeFromEmergencyStop()
+			end
+			EzhubCore.Config[configKey] = nextVal
+			EzhubCore.SaveConfig()
+			refreshVisual()
+			if typeof(onChanged) == "function" then
+				onChanged(nextVal)
+			end
+		end)
+		return btn
+	end
+
+	local function addActionButton(parent, labelText, accentColor, callback)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, 0, 0, 32)
+		btn.BackgroundColor3 = accentColor or Color3.fromRGB(32, 48, 82)
+		btn.TextColor3 = Color3.fromRGB(245, 250, 255)
+		btn.Font = Enum.Font.GothamBold
+		btn.TextSize = 11
+		btn.Text = labelText
+		btn.Parent = parent
+		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+		btn.MouseButton1Click:Connect(function()
+			pcall(callback)
+		end)
+		return btn
+	end
+
+	-- Khởi tạo các Tab chính
+	addTabButton("Farm & Stats", "Farm")
+	addTabButton("Đai / Rồng / Storm", "DragonBelt")
+	addTabButton("Teleport & ESP", "TeleEsp")
+	addTabButton("GFX / Server / Config", "PerfServer")
+
+	local pFarm = createPage("Farm")
+	local pDragon = createPage("DragonBelt")
+	local pTeleEsp = createPage("TeleEsp")
+	local pPerf = createPage("PerfServer")
+
+	-- Trang 1: Farm, Stats, Loot & Shop
+	addToggle(pFarm, "Auto Farm Mục Tiêu", "AutoFarm")
+	addActionButton(pFarm, "Đổi Mục Tiêu Farm (Mob / Boss)", Color3.fromRGB(36, 46, 72), function()
+		EzhubCore.Config.AutoFarmTargetType = (EzhubCore.Config.AutoFarmTargetType == "Boss") and "Mob" or "Boss"
+		EzhubCore.SaveConfig()
+		EzhubCore.Notify("Auto Farm", "Chế độ mục tiêu: " .. EzhubCore.Config.AutoFarmTargetType)
+	end)
+	addToggle(pFarm, "Auto Stats (Theo Nhánh & Điểm)", "AutoStats")
+	addActionButton(pFarm, "Đổi Nhánh Stat (Melee/Def/Sword/Gun/Fruit)", Color3.fromRGB(36, 46, 72), function()
+		local order = { "Melee", "Defense", "Sword", "Gun", "Fruit" }
+		local cur = EzhubCore.Config.StatBranch
+		local nextIdx = 1
+		for i, v in ipairs(order) do
+			if v == cur then
+				nextIdx = (i % #order) + 1
+				break
+			end
+		end
+		EzhubCore.Config.StatBranch = order[nextIdx]
+		EzhubCore.SaveConfig()
+		EzhubCore.Notify("Auto Stats", "Nhánh hiện tại: " .. EzhubCore.Config.StatBranch)
+	end)
+	addToggle(pFarm, "Tự Động Nhặt Item", "AutoLoot")
+	addToggle(pFarm, "Tự Mua Vật Phẩm Cơ Bản", "AutoBuyBasicItems")
+	addToggle(pFarm, "Tự Động Mua Trái Ác Quỷ", "AutoBuyFruit")
+
+	-- Trang 2: Chuỗi Đai 1-8, Tuần tra Đảo Rồng, Tương tác, Dọn cản & Dragon Storm
+	addToggle(pDragon, "Tuần Tra Vòng Vòng Săn Đảo Rồng", "AutoPatrolDragonIsland")
+	addToggle(pDragon, "Chuỗi Lấy Đai 1-8", "BeltQuestEnabled")
+	addToggle(pDragon, "Chuỗi Lấy Dragon Storm", "DragonStormQuestEnabled")
+	addToggle(pDragon, "Tự Tương Tác / Nhận Nhiệm Vụ", "AutoInteractMission")
+	addToggle(pDragon, "Tự Đánh / Dọn Mục Tiêu Cản Đường", "AutoClearPathMobs")
+	addActionButton(pDragon, "Dò Tìm Đảo Rồng Ngay Lập Tức", Color3.fromRGB(28, 76, 110), function()
+		local info = DragonBelt.FindDragonIsland()
+		if info then
+			EzhubCore.Notify("Dragon Island", "Phát hiện Đảo Rồng: " .. info.Model.Name)
+		else
+			EzhubCore.Notify("Dragon Island", "Chưa thấy Đảo Rồng trong phạm vi quét.")
+		end
+	end)
+
+	-- Trang 3: Teleport & ESP (kèm làm mới ESP Player khi Respawn / Join)
+	addActionButton(pTeleEsp, "Dịch Chuyển Tới Điểm Đã Chọn (Sea Hiện Tại)", Color3.fromRGB(32, 64, 96), function()
+		Gameplay.TeleportToSelectedTarget()
+	end)
+	addActionButton(pTeleEsp, "Chuyển Sea Tiếp Theo (Khi Đủ Điều Kiện)", Color3.fromRGB(32, 64, 96), function()
+		Gameplay.TravelToNextSeaIfEligible()
+	end)
+	addActionButton(pTeleEsp, "Lưu Vị Trí Hiện Tại (Save Position)", Color3.fromRGB(45, 55, 85), function()
+		Gameplay.SaveCurrentPosition()
+	end)
+	addActionButton(pTeleEsp, "Dịch Chuyển Về Vị Trí Đã Lưu", Color3.fromRGB(45, 55, 85), function()
+		Gameplay.TeleportToSavedPosition()
+	end)
+	addToggle(pTeleEsp, "ESP Player (Tự Làm Mới Respawn/Join)", "EspPlayer")
+	addToggle(pTeleEsp, "ESP Boss / Mob", "EspMobBoss")
+	addToggle(pTeleEsp, "ESP Fruit / Island", "EspLootIsland")
+
+	-- Trang 4: Đồ họa khoai tây, Khôi phục hiệu ứng, Chống AFK, Server Hop/Reconnect, Stop All & Config
+	addToggle(pPerf, "Đồ Họa Khoai Tây (Tối Ưu FPS)", "PotatoGraphics", function(enabled)
+		if enabled then
+			PerfAndGui.ApplyPotatoGraphics(isSeaEventHeavy())
+		else
+			PerfAndGui.RestoreVisualEffects()
+		end
+	end)
+	addActionButton(pPerf, "Khôi Phục / Bật Lại Hiệu Ứng Hiển Thị", Color3.fromRGB(25, 92, 74), function()
+		PerfAndGui.RestoreVisualEffects()
+	end)
+	addToggle(pPerf, "Tự Giảm Tải Vùng Biển Nhiều Sự Kiện", "AutoHeavyCullInEventSea")
+	addToggle(pPerf, "Chống AFK (Anti-AFK)", "AntiAfk")
+	addToggle(pPerf, "Tự Kết Nối Lại (Auto Reconnect)", "AutoReconnect")
+	addToggle(pPerf, "Tránh Vào Lặp Server Đã Ghé", "AvoidVisitedServers")
+	addToggle(pPerf, "Tự Bật Lại Cấu Hình Sau Khi Đổi Server", "AutoRestoreModesAfterHop")
+	addActionButton(pPerf, "Server Hop (Tìm Server Ít Người)", Color3.fromRGB(68, 42, 110), function()
+		PerfAndGui.HopToLowPopulationServer()
+	end)
+	addActionButton(pPerf, "Lưu Nhanh Cấu Hình (Save Config)", Color3.fromRGB(30, 75, 105), function()
+		EzhubCore.SaveConfig("quick")
+	end)
+	addActionButton(pPerf, "Tải Cấu Hình Nhanh (Load Config)", Color3.fromRGB(30, 75, 105), function()
+		EzhubCore.LoadConfig("quick")
+	end)
+	addActionButton(pPerf, "STOP ALL (Dừng Khẩn Cấp Toàn Bộ)", Color3.fromRGB(130, 26, 42), function()
+		EzhubCore.StopAllActiveModes()
+	end)
+
+	selectPage("Farm")
+	EzhubCore.Notify("System", "Đã khởi tạo hoàn tất Ezhub v1 (4/4 module).")
+
+	return PerfAndGui
+end
+
+return attachPerfServerAndGui
