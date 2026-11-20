@@ -1,0 +1,572 @@
+-- Phần 1: Khởi tạo Giao diện, Danh sách Người chơi & Trạng thái Hệ thống
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local plr = Players.LocalPlayer
+local gui = plr:WaitForChild("PlayerGui")
+
+-- Xóa GUI cũ nếu có để tránh bị đè
+if gui:FindFirstChild("LiteNeonFling") then
+	gui.LiteNeonFling:Destroy()
+end
+
+-- Tạo ScreenGui chính
+local sc = Instance.new("ScreenGui")
+sc.Name = "LiteNeonFling"
+sc.ResetOnSpawn = false
+sc.Parent = gui
+
+-- Khung chính (Main Frame)
+local frm = Instance.new("Frame")
+frm.Size = UDim2.new(0, 280, 0, 310)
+frm.Position = UDim2.new(0.5, -140, 0.5, -155)
+frm.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frm.Active = true
+frm.Draggable = true
+frm.Parent = sc
+
+Instance.new("UICorner", frm).CornerRadius = UDim.new(0, 8)
+
+-- Viền Neon cho Khung chính
+local frmStroke = Instance.new("UIStroke")
+frmStroke.Color = Color3.fromRGB(0, 255, 100)
+frmStroke.Thickness = 2
+frmStroke.Parent = frm
+
+-- Thanh tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.TextColor3 = Color3.fromRGB(0, 255, 100)
+title.Text = "  Lite Fling Hub + Neon & TP"
+title.TextSize = 13
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frm
+
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+
+-- Nút Xóa GUI (X)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -27, 0, 3)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "X"
+closeBtn.TextSize = 11
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = title
+
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút Thu gọn (-)
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 24, 0, 24)
+minBtn.Position = UDim2.new(1, -55, 0, 3)
+minBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Text = "-"
+minBtn.TextSize = 14
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = title
+
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút Bật/Tắt Fling chính
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -16, 0, 32)
+btn.Position = UDim2.new(0, 8, 0, 36)
+btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Text = "Status: OFF"
+btn.TextSize = 13
+btn.Font = Enum.Font.GothamBold
+btn.Parent = frm
+
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(255, 50, 50)
+btnStroke.Thickness = 2
+btnStroke.Parent = btn
+
+-- Khu vực cài đặt cấu hình Target TP (Khoảng cách, Trước/Sau, Thời gian)
+local configFrame = Instance.new("Frame")
+configFrame.Size = UDim2.new(1, -16, 0, 55)
+configFrame.Position = UDim2.new(0, 8, 0, 74)
+configFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+configFrame.Parent = frm
+Instance.new("UICorner", configFrame).CornerRadius = UDim.new(0, 6)
+
+-- Ô chỉnh khoảng cách (Studs)
+local distBox = Instance.new("TextBox")
+distBox.Size = UDim2.new(0, 75, 0, 22)
+distBox.Position = UDim2.new(0, 5, 0, 4)
+distBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+distBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+distBox.Text = "2"
+distBox.PlaceholderText = "Khoảng cách"
+distBox.TextSize = 11
+distBox.Font = Enum.Font.Gotham
+distBox.Parent = configFrame
+Instance.new("UICorner", distBox).CornerRadius = UDim.new(0, 4)
+
+-- Nút chỉnh loại Trước / Sau
+local sideBtn = Instance.new("TextButton")
+sideBtn.Size = UDim2.new(0, 75, 0, 22)
+sideBtn.Position = UDim2.new(0, 85, 0, 4)
+sideBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+sideBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
+sideBtn.Text = "Loại: Trước"
+sideBtn.TextSize = 11
+sideBtn.Font = Enum.Font.GothamBold
+sideBtn.Parent = configFrame
+Instance.new("UICorner", sideBtn).CornerRadius = UDim.new(0, 4)
+
+-- Ô chỉnh thời gian (Giây) dành cho chế độ 2
+local timeBox = Instance.new("TextBox")
+timeBox.Size = UDim2.new(0, 92, 0, 22)
+timeBox.Position = UDim2.new(0, 165, 0, 4)
+timeBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+timeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+timeBox.Text = "1"
+timeBox.PlaceholderText = "Thời gian (s)"
+timeBox.TextSize = 11
+timeBox.Font = Enum.Font.Gotham
+timeBox.Parent = configFrame
+Instance.new("UICorner", timeBox).CornerRadius = UDim.new(0, 4)
+
+-- Nút Chuyển Chế độ (Chế độ 1 / Chế độ 2)
+local modeBtn = Instance.new("TextButton")
+modeBtn.Size = UDim2.new(0, 125, 0, 22)
+modeBtn.Position = UDim2.new(0, 5, 0, 29)
+modeBtn.BackgroundColor3 = Color3.fromRGB(50, 40, 80)
+modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+modeBtn.Text = "Chế độ: 1 (Đơn)"
+modeBtn.TextSize = 11
+modeBtn.Font = Enum.Font.GothamBold
+modeBtn.Parent = configFrame
+Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Nút White list / Black list (Chỉ hiện ở Chế độ 2)
+local listTypeBtn = Instance.new("TextButton")
+listTypeBtn.Size = UDim2.new(0, 125, 0, 22)
+listTypeBtn.Position = UDim2.new(0, 133, 0, 29)
+listTypeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+listTypeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+listTypeBtn.Text = "Loại: White list"
+listTypeBtn.TextSize = 11
+listTypeBtn.Font = Enum.Font.GothamBold
+listTypeBtn.Visible = false
+listTypeBtn.Parent = configFrame
+Instance.new("UICorner", listTypeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Khung chứa danh sách người chơi (ScrollingFrame)
+local playerScroll = Instance.new("ScrollingFrame")
+playerScroll.Size = UDim2.new(1, -16, 0, 110)
+playerScroll.Position = UDim2.new(0, 8, 0, 133)
+playerScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+playerScroll.BorderSizePixel = 0
+playerScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerScroll.ScrollBarThickness = 4
+playerScroll.Parent = frm
+Instance.new("UICorner", playerScroll).CornerRadius = UDim.new(0, 6)
+
+local uiListLayout = Instance.new("UIListLayout", playerScroll)
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 3)
+
+-- Nút Bật/Tắt Target Teleport
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(1, -16, 0, 28)
+tpBtn.Position = UDim2.new(0, 8, 0, 248)
+tpBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.Text = "Target TP: OFF"
+tpBtn.TextSize = 12
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.Parent = frm
+Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+local tpStroke = Instance.new("UIStroke")
+tpStroke.Color = Color3.fromRGB(255, 50, 50)
+tpStroke.Thickness = 2
+tpStroke.Parent = tpBtn
+-- Phần 2: Logic Xử lý (Fling Nâng Cấp, Velocity Prediction, Quét Vùng & Target TP)
+local isFlinging = false
+local flingConn = nil
+local isMinimized = false
+local neonBox = nil
+
+-- Biến logic quản lý Target & Chế độ
+local currentMode = 1 -- 1: Đơn, 2: Đa
+local listType = "White" -- "White" hoặc "Black"
+local targetType = "Trước" -- "Trước" hoặc "Sau"
+
+-- Lưu trữ danh sách đã chọn riêng biệt cho từng chế độ
+local selectedMode1 = nil
+local selectedMode2 = {}
+
+local isTPRunning = false
+local tpThread = nil
+local savedCollideStates = {}
+
+-- Thông số bù độ trễ mạng & quét va chạm (có thể tinh chỉnh theo ping / anti-fling)
+local PING_COMPENSATION = 0.16 -- Giây dự đoán hướng chạy (0.12 - 0.25s)
+local JITTER_RADIUS = 1.35    -- Bán kính quét bù sai số vị trí (studs)
+local FLY_HOLD_TIME = 0.45    -- Thời gian bám ép liên tục trên mỗi mục tiêu ở Chế độ 2 (giây)
+local FLING_LINEAR_XY = 450000
+local FLING_LINEAR_Y = 260000
+
+local function getRoot(char)
+	if not char then return nil end
+	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+end
+
+local function toggleNeonVisual(char, root, state)
+	if state then
+		if char and root and not char:FindFirstChild("NeonFlingVisual") then
+			neonBox = Instance.new("SelectionBox")
+			neonBox.Name = "NeonFlingVisual"
+			neonBox.Adornee = root
+			neonBox.Color3 = Color3.fromRGB(0, 255, 100)
+			neonBox.LineThickness = 0.05
+			neonBox.SurfaceColor3 = Color3.fromRGB(0, 255, 100)
+			neonBox.SurfaceTransparency = 0.8
+			neonBox.Parent = char
+		end
+	else
+		if neonBox then
+			neonBox:Destroy()
+			neonBox = nil
+		end
+		if char then
+			local oldVisual = char:FindFirstChild("NeonFlingVisual")
+			if oldVisual then oldVisual:Destroy() end
+		end
+	end
+end
+
+local function applyNoclip(char, enable)
+	if not char then return end
+	if enable then
+		table.clear(savedCollideStates)
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				savedCollideStates[part] = part.CanCollide
+				part.CanCollide = false
+			end
+		end
+	else
+		for part, oldState in pairs(savedCollideStates) do
+			if part and part.Parent then
+				part.CanCollide = oldState
+			end
+		end
+		table.clear(savedCollideStates)
+	end
+end
+
+local function getPredictedCFrame(targetRoot, dist, side)
+	local vel = targetRoot.AssemblyLinearVelocity
+	local horizontalVel = Vector3.new(vel.X, 0, vel.Z)
+	local predictedPos = targetRoot.Position + (horizontalVel * PING_COMPENSATION)
+
+	if math.abs(vel.Y) > 15 then
+		predictedPos += Vector3.new(0, math.clamp(vel.Y * (PING_COMPENSATION * 0.5), -6, 6), 0)
+	end
+
+	local lookDir = targetRoot.CFrame.LookVector
+	local flatLook = Vector3.new(lookDir.X, 0, lookDir.Z)
+	if flatLook.Magnitude < 0.01 then
+		flatLook = Vector3.new(0, 0, -1)
+	else
+		flatLook = flatLook.Unit
+	end
+
+	local sideDir = (side == "Trước") and flatLook or -flatLook
+	local finalPos = predictedPos + (sideDir * dist)
+	return CFrame.lookAt(finalPos, predictedPos)
+end
+
+local function applyJitterAndFling(root, t)
+	local jx = math.sin(t * 47) * JITTER_RADIUS
+	local jy = math.cos(t * 39) * (JITTER_RADIUS * 0.65)
+	local jz = math.cos(t * 53) * JITTER_RADIUS
+	root.CFrame = root.CFrame * CFrame.new(jx, jy, jz)
+
+	root.AssemblyAngularVelocity = Vector3.new(0, 9999, 0)
+	local dirX = (math.sin(t * 31) >= 0) and 1 or -1
+	local dirZ = (math.cos(t * 29) >= 0) and 1 or -1
+	root.AssemblyLinearVelocity = Vector3.new(FLING_LINEAR_XY * dirX, FLING_LINEAR_Y, FLING_LINEAR_XY * dirZ)
+end
+
+-- Cập nhật và vẽ lại danh sách người chơi trong ScrollingFrame
+local function updatePlayerList()
+	for _, child in ipairs(playerScroll:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+
+	local allPlayers = Players:GetPlayers()
+	local visibleCount = 0
+
+	for _, p in ipairs(allPlayers) do
+		if p ~= plr then
+			visibleCount += 1
+			local pBtn = Instance.new("TextButton")
+			pBtn.Size = UDim2.new(1, -4, 0, 26)
+			pBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+			pBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+			pBtn.TextSize = 11
+			pBtn.Font = Enum.Font.Gotham
+			pBtn.TextXAlignment = Enum.TextXAlignment.Left
+			pBtn.Parent = playerScroll
+			Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
+
+			local isSelected = false
+			if currentMode == 1 then
+				isSelected = (selectedMode1 == p)
+			else
+				isSelected = (selectedMode2[p] ~= nil)
+			end
+
+			local checkMark = isSelected and " [✓] " or " [   ] "
+			local displayName = p.DisplayName or p.Name
+			pBtn.Text = "  " .. displayName .. " (@" .. p.Name .. ")" .. checkMark
+
+			if isSelected then
+				pBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 50)
+			end
+
+			pBtn.MouseButton1Click:Connect(function()
+				if currentMode == 1 then
+					selectedMode1 = (selectedMode1 == p) and nil or p
+				else
+					selectedMode2[p] = selectedMode2[p] and nil or p
+				end
+				updatePlayerList()
+			end)
+		end
+	end
+
+	playerScroll.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 29)
+end
+
+-- Chuyển đổi chế độ 1 <-> 2
+modeBtn.MouseButton1Click:Connect(function()
+	if currentMode == 1 then
+		currentMode = 2
+		modeBtn.Text = "Chế độ: 2 (Đa)"
+		listTypeBtn.Visible = true
+	else
+		currentMode = 1
+		modeBtn.Text = "Chế độ: 1 (Đơn)"
+		listTypeBtn.Visible = false
+	end
+	updatePlayerList()
+end)
+
+-- Chuyển đổi White list / Black list
+listTypeBtn.MouseButton1Click:Connect(function()
+	if listType == "White" then
+		listType = "Black"
+		listTypeBtn.Text = "Loại: Black list"
+		listTypeBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+	else
+		listType = "White"
+		listTypeBtn.Text = "Loại: White list"
+		listTypeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+	end
+end)
+
+-- Chuyển đổi loại Trước / Sau
+sideBtn.MouseButton1Click:Connect(function()
+	if targetType == "Trước" then
+		targetType = "Sau"
+		sideBtn.Text = "Loại: Sau"
+	else
+		targetType = "Trước"
+		sideBtn.Text = "Loại: Trước"
+	end
+end)
+
+-- Nút Thu gọn (-) / Mở rộng (+)
+minBtn.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		minBtn.Text = "+"
+		configFrame.Visible = false
+		playerScroll.Visible = false
+		tpBtn.Visible = false
+		btn.Visible = false
+		frm.Size = UDim2.new(0, 280, 0, 30)
+	else
+		minBtn.Text = "-"
+		configFrame.Visible = true
+		playerScroll.Visible = true
+		tpBtn.Visible = true
+		btn.Visible = true
+		frm.Size = UDim2.new(0, 280, 0, 310)
+	end
+end)
+
+-- Nút Đóng (X)
+closeBtn.MouseButton1Click:Connect(function()
+	isFlinging = false
+	isTPRunning = false
+	if flingConn then flingConn:Disconnect(); flingConn = nil end
+	if tpThread then task.cancel(tpThread); tpThread = nil end
+	applyNoclip(plr.Character, false)
+	toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+	sc:Destroy()
+end)
+
+-- Nút Bật/Tắt Fling chính
+btn.MouseButton1Click:Connect(function()
+	isFlinging = not isFlinging
+	local char = plr.Character
+	local root = getRoot(char)
+
+	if isFlinging then
+		if not char or not root then
+			btn.Text = "No Character!"
+			isFlinging = false
+			return
+		end
+		btn.Text = "Fling: ON (Active)"
+		btnStroke.Color = Color3.fromRGB(0, 255, 100)
+
+		toggleNeonVisual(char, root, true)
+		applyNoclip(char, true)
+
+		local elapsed = 0
+		flingConn = RunService.Heartbeat:Connect(function(dt)
+			elapsed += dt
+			local currChar = plr.Character
+			local currRoot = getRoot(currChar)
+			if not currChar or not currRoot or not isFlinging then return end
+
+			for _, part in ipairs(currChar:GetDescendants()) do
+				if part:IsA("BasePart") and part.CanCollide then
+					savedCollideStates[part] = true
+					part.CanCollide = false
+				end
+			end
+
+			local activeTarget = nil
+			if isTPRunning and currentMode == 1 and selectedMode1 and selectedMode1.Character then
+				activeTarget = getRoot(selectedMode1.Character)
+			end
+
+			if activeTarget then
+				local dist = tonumber(distBox.Text) or 2
+				currRoot.CFrame = getPredictedCFrame(activeTarget, dist, targetType)
+			end
+
+			applyJitterAndFling(currRoot, elapsed)
+		end)
+	else
+		btn.Text = "Status: OFF"
+		btnStroke.Color = Color3.fromRGB(255, 50, 50)
+		if flingConn then flingConn:Disconnect(); flingConn = nil end
+		toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
+		applyNoclip(plr.Character, false)
+		local currRoot = getRoot(plr.Character)
+		if currRoot then
+			currRoot.AssemblyAngularVelocity = Vector3.zero
+			currRoot.AssemblyLinearVelocity = Vector3.zero
+		end
+	end
+end)
+
+-- Logic Xử lý Target Teleport
+tpBtn.MouseButton1Click:Connect(function()
+	isTPRunning = not isTPRunning
+	if isTPRunning then
+		tpBtn.Text = "Target TP: ON"
+		tpStroke.Color = Color3.fromRGB(0, 255, 100)
+
+		if tpThread then task.cancel(tpThread) end
+		tpThread = task.spawn(function()
+			while isTPRunning do
+				local char = plr.Character
+				local root = getRoot(char)
+				local dist = tonumber(distBox.Text) or 2
+				local cycleDelay = math.max(0.05, tonumber(timeBox.Text) or 1)
+
+				if char and root then
+					if currentMode == 1 then
+						if selectedMode1 and selectedMode1.Character then
+							local targetRoot = getRoot(selectedMode1.Character)
+							if targetRoot then
+								root.CFrame = getPredictedCFrame(targetRoot, dist, targetType)
+							end
+						end
+						RunService.Heartbeat:Wait()
+					else
+						local targetsToTP = {}
+						if listType == "White" then
+							for _, p in pairs(selectedMode2) do
+								if p and p.Parent == Players then
+									table.insert(targetsToTP, p)
+								end
+							end
+						else
+							for _, p in ipairs(Players:GetPlayers()) do
+								if p ~= plr and not selectedMode2[p] then
+									table.insert(targetsToTP, p)
+								end
+							end
+						end
+
+						if #targetsToTP > 0 then
+							for _, targetP in ipairs(targetsToTP) do
+								if not isTPRunning then break end
+								local holdUntil = os.clock() + (isFlinging and FLY_HOLD_TIME or 0.05)
+
+								while isTPRunning and os.clock() < holdUntil do
+									local currChar = plr.Character
+									local currRoot = getRoot(currChar)
+									local tRoot = targetP and targetP.Character and getRoot(targetP.Character)
+									if currChar and currRoot and tRoot then
+										currRoot.CFrame = getPredictedCFrame(tRoot, dist, targetType)
+									else
+										break
+									end
+									RunService.Heartbeat:Wait()
+								end
+
+								local remainWait = cycleDelay - (isFlinging and FLY_HOLD_TIME or 0)
+								if remainWait > 0 and isTPRunning then
+									task.wait(remainWait)
+								end
+							end
+						else
+							task.wait(0.4)
+						end
+					end
+				else
+					task.wait(0.4)
+				end
+			end
+		end)
+	else
+		tpBtn.Text = "Target TP: OFF"
+		tpStroke.Color = Color3.fromRGB(255, 50, 50)
+		if tpThread then task.cancel(tpThread); tpThread = nil end
+	end
+end)
+
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(function(leavingPlr)
+	if selectedMode1 == leavingPlr then
+		selectedMode1 = nil
+	end
+	if selectedMode2[leavingPlr] then
+		selectedMode2[leavingPlr] = nil
+	end
+	updatePlayerList()
+end)
+
+updatePlayerList()
