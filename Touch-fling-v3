@@ -220,6 +220,14 @@ local function getRoot(char)
 	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
 end
 
+local function resetVelocity(char)
+	local root = getRoot(char)
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
 local function toggleNeonVisual(char, root, state)
 	if state then
 		if char and root and not char:FindFirstChild("NeonFlingVisual") then
@@ -419,6 +427,7 @@ closeBtn.MouseButton1Click:Connect(function()
 	isTPRunning = false
 	if flingConn then flingConn:Disconnect(); flingConn = nil end
 	if tpThread then task.cancel(tpThread); tpThread = nil end
+	resetVelocity(plr.Character)
 	applyNoclip(plr.Character, false)
 	toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
 	sc:Destroy()
@@ -482,6 +491,7 @@ btn.MouseButton1Click:Connect(function()
 		if flingConn then flingConn:Disconnect(); flingConn = nil end
 		toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
 		if not isTPRunning then
+			resetVelocity(plr.Character)
 			applyNoclip(plr.Character, false)
 		end
 	end
@@ -578,6 +588,7 @@ tpBtn.MouseButton1Click:Connect(function()
 		tpBtn.Text = "Target TP: OFF"
 		tpStroke.Color = Color3.fromRGB(255, 50, 50)
 		if tpThread then task.cancel(tpThread); tpThread = nil end
+		resetVelocity(plr.Character)
 		if not isFlinging then
 			applyNoclip(plr.Character, false)
 		end
