@@ -1,0 +1,387 @@
+-- [[ EZHUB V1 - PART 1/4: CORE STATE, PRIORITY, SAFETY, ANTI-STUCK, LOG & CONFIG ]] --
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+local LocalPlayer = Players.LocalPlayer
+local CONFIG_FOLDER = "EzhubV1"
+local CONFIG_FILE = CONFIG_FOLDER .. "/config_latest.json"
+local VISITED_SERVERS_FILE = CONFIG_FOLDER .. "/visited_servers.json"
+
+local EzhubCore = {}
+EzhubCore.Threads = {}
+EzhubCore.Signals = {}
+EzhubCore.Logs = {}
+EzhubCore.ToastCallback = nil
+EzhubCore.IsPausedByHP = false
+EzhubCore.SavedModesBeforeHP = {}
+EzhubCore.VisitedServers = {}
+
+-- Cấu hình đầy đủ theo 60 câu hỏi đã chốt
+EzhubCore.DefaultConfig = {
+	-- Farm & Combat
+	AutoFarm = false,
+	AutoFarmTargetType = "Mob", -- "Mob" | "Boss"
+	AutoStats = false,
+	StatBranch = "Melee", -- "Melee" | "Defense" | "Sword" | "Gun" | "Fruit"
+	StatPointsPerStep = 1,
+	AutoLoot = false,
+	AutoBuyBasicItems = false,
+	AutoBuyFruit = false,
+
+	-- Teleport
+	SelectedSeaTarget = "",
+	SavedPosition = nil, -- {x, y, z}
+
+	-- ESP / Visual
+	EspPlayer = false,
+	EspMobBoss = false,
+	EspLootIsland = false,
+	EspRefreshOnRespawnJoin = true,
+	EspScanInterval = 0.35,
+
+	-- Đai 1-8, Đảo Rồng & Dragon Storm
+	BeltQuestEnabled = false,
+	BeltTargetStage = "Auto", -- "Auto" hoặc 1..8
+	AutoPatrolDragonIsland = false,
+	DragonScanInterval = 0.45,
+	AutoInteractMission = false,
+	AutoClearPathMobs = false,
+	DragonStormQuestEnabled = false,
+
+	-- Performance & AFK
+	PotatoGraphics = false,
+	RestoreEffectsRequested = false,
+	AutoHeavyCullInEventSea = true,
+	AntiAfk = true,
+
+	-- Server & Reconnect
+	AutoReconnect = true,
+	ServerHopMinPlayers = true,
+	AutoRestoreModesAfterHop = true,
+	AvoidVisitedServers = true,
+
+	-- Safety, Anti-Stuck & UX
+	EmergencyStopAll = false,
+	LowHpPauseEnabled = true,
+	LowHpThresholdRatio = 0.28, -- 28% HP
+	SafeHpResumeRatio = 0.75, -- 75% HP
+	AutoResumeOnSafeHp = true,
+	AntiStuckEnabled = true,
+	StuckTimeoutSeconds = 8,
+	ShowCompactLog = true,
+	MaxLogEntries = 60,
+}
+
+EzhubCore.Config = {}
+for k, v in pairs(EzhubCore.DefaultConfig) do
+	EzhubCore.Config[k] = v
+end
+
+-- Thứ tự ưu tiên: 1 = An toàn / Hồi máu, 2 = Bước nhiệm vụ / Mục tiêu chính, 3 = Tác vụ phụ
+EzhubCore.Priority = {
+	SAFETY_HP = 1,
+	MISSION_CORE = 2,
+	SECONDARY = 3,
+}
+EzhubCore.ActivePriorityLevel = 99
+
+function EzhubCore.Notify(category, message)
+	local timestamp = os.date("%H:%M:%S")
+	local entry = string.format("[%s][%s] %s", timestamp, category, message)
+	table.insert(EzhubCore.Logs, 1, entry)
+	while #EzhubCore.Logs > (EzhubCore.Config.MaxLogEntries or 60) do
+		table.remove(EzhubCore.Logs)
+	end
+	if EzhubCore.Config.ShowCompactLog and typeof(EzhubCore.ToastCallback) == "function" then
+		pcall(EzhubCore.ToastCallback, category, message, timestamp)
+	end
+end
+
+function EzhubCore.CanRunFeature(featureName, requiredPriority)
+	if EzhubCore.Config.EmergencyStopAll then
+		return false
+	end
+	if EzhubCore.IsPausedByHP and featureName ~= "SafetyMonitor" and featureName ~= "AntiAfk" then
+		return false
+	end
+	local reqPrio = requiredPriority or EzhubCore.Priority.SECONDARY
+	if EzhubCore.ActivePriorityLevel < reqPrio then
+		return false
+	end
+	return true
+end
+
+function EzhubCore.AcquirePriority(level)
+	if level <= EzhubCore.ActivePriorityLevel then
+		EzhubCore.ActivePriorityLevel = level
+		return true
+	end
+	return false
+end
+
+function EzhubCore.ReleasePriority(level)
+	if EzhubCore.ActivePriorityLevel == level then
+		EzhubCore.ActivePriorityLevel = 99
+	end
+end
+
+-- Quản lý vòng lặp & kết nối để ngắt sạch sẽ khi tắt nút
+function EzhubCore.RegisterThread(name, fn)
+	EzhubCore.StopThread(name)
+	local running = true
+	local controller = {
+		Alive = true,
+		Stop = function()
+			running = false
+		end,
+	}
+	EzhubCore.Threads[name] = controller
+	task.spawn(function()
+		while running and controller.Alive do
+			local ok, err = pcall(fn, function()
+				return running and controller.Alive and not EzhubCore.Config.EmergencyStopAll
+			end)
+			if not ok then
+				EzhubCore.Notify("Error", name .. ": " .. tostring(err))
+				task.wait(0.5)
+			end
+		end
+		controller.Alive = false
+	end)
+	return controller
+end
+
+function EzhubCore.StopThread(name)
+	local ctrl = EzhubCore.Threads[name]
+	if ctrl then
+		ctrl.Alive = false
+		ctrl.Stop()
+		EzhubCore.Threads[name] = nil
+	end
+end
+
+function EzhubCore.StopAllActiveModes()
+	EzhubCore.Config.EmergencyStopAll = true
+	local toggleKeys = {
+		"AutoFarm",
+		"AutoStats",
+		"AutoLoot",
+		"AutoBuyBasicItems",
+		"AutoBuyFruit",
+		"BeltQuestEnabled",
+		"AutoPatrolDragonIsland",
+		"AutoInteractMission",
+		"AutoClearPathMobs",
+		"DragonStormQuestEnabled",
+	}
+	for _, key in ipairs(toggleKeys) do
+		EzhubCore.Config[key] = false
+	end
+	EzhubCore.IsPausedByHP = false
+	EzhubCore.ReleasePriority(EzhubCore.Priority.SAFETY_HP)
+	EzhubCore.ReleasePriority(EzhubCore.Priority.MISSION_CORE)
+	EzhubCore.SaveConfig()
+	EzhubCore.Notify("Stop All", "Đã dừng khẩn cấp toàn bộ chế độ tự động.")
+end
+
+function EzhubCore.ResumeFromEmergencyStop()
+	EzhubCore.Config.EmergencyStopAll = false
+	EzhubCore.SaveConfig()
+	EzhubCore.Notify("System", "Đã mở khóa trạng thái dừng khẩn cấp.")
+end
+
+-- Lưu / Tải cấu hình & tự ghi nhớ thiết lập gần nhất
+function EzhubCore.SaveConfig(customSlot)
+	if not (typeof(writefile) == "function" and typeof(isfolder) == "function" and typeof(makefolder) == "function") then
+		return false
+	end
+	local ok, err = pcall(function()
+		if not isfolder(CONFIG_FOLDER) then
+			makefolder(CONFIG_FOLDER)
+		end
+		local path = customSlot and (CONFIG_FOLDER .. "/slot_" .. tostring(customSlot) .. ".json") or CONFIG_FILE
+		writefile(path, HttpService:JSONEncode(EzhubCore.Config))
+	end)
+	if ok then
+		EzhubCore.Notify("Config", customSlot and ("Đã lưu Slot " .. tostring(customSlot)) or "Đã tự động ghi nhớ cấu hình.")
+	else
+		EzhubCore.Notify("Config", "Không thể ghi file cấu hình: " .. tostring(err))
+	end
+	return ok
+end
+
+function EzhubCore.LoadConfig(customSlot)
+	if not (typeof(readfile) == "function" and typeof(isfile) == "function") then
+		return false
+	end
+	local path = customSlot and (CONFIG_FOLDER .. "/slot_" .. tostring(customSlot) .. ".json") or CONFIG_FILE
+	if not isfile(path) then
+		return false
+	end
+	local ok, decoded = pcall(function()
+		return HttpService:JSONDecode(readfile(path))
+	end)
+	if ok and type(decoded) == "table" then
+		for k, v in pairs(decoded) do
+			if EzhubCore.DefaultConfig[k] ~= nil then
+				EzhubCore.Config[k] = v
+			end
+		end
+		EzhubCore.Notify("Config", customSlot and ("Đã tải Slot " .. tostring(customSlot)) or "Đã khôi phục cấu hình gần nhất.")
+		return true
+	end
+	return false
+end
+
+function EzhubCore.LoadVisitedServers()
+	EzhubCore.VisitedServers = {}
+	if typeof(isfile) == "function" and typeof(readfile) == "function" and isfile(VISITED_SERVERS_FILE) then
+		pcall(function()
+			local data = HttpService:JSONDecode(readfile(VISITED_SERVERS_FILE))
+			if type(data) == "table" then
+				EzhubCore.VisitedServers = data
+			end
+		end)
+	end
+	if game.JobId and game.JobId ~= "" then
+		EzhubCore.VisitedServers[tostring(game.JobId)] = os.time()
+	end
+end
+
+function EzhubCore.MarkCurrentServerVisited()
+	if game.JobId and game.JobId ~= "" then
+		EzhubCore.VisitedServers[tostring(game.JobId)] = os.time()
+		if typeof(writefile) == "function" and typeof(isfolder) == "function" and typeof(makefolder) == "function" then
+			pcall(function()
+				if not isfolder(CONFIG_FOLDER) then
+					makefolder(CONFIG_FOLDER)
+				end
+				writefile(VISITED_SERVERS_FILE, HttpService:JSONEncode(EzhubCore.VisitedServers))
+			end)
+		end
+	end
+end
+
+-- Theo dõi máu thấp -> Tạm dừng an toàn -> Hồi máu đủ ngưỡng -> Tự bật lại chế độ cũ
+local function getHumanoid()
+	local char = LocalPlayer.Character
+	return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function snapshotRunningModes()
+	local keys = {
+		"AutoFarm",
+		"AutoPatrolDragonIsland",
+		"BeltQuestEnabled",
+		"DragonStormQuestEnabled",
+		"AutoInteractMission",
+		"AutoClearPathMobs",
+	}
+	local snap = {}
+	for _, k in ipairs(keys) do
+		snap[k] = EzhubCore.Config[k] == true
+	end
+	return snap
+end
+
+local function restoreModesSnapshot(snap)
+	if type(snap) ~= "table" then
+		return
+	end
+	for k, active in pairs(snap) do
+		if active then
+			EzhubCore.Config[k] = true
+		end
+	end
+end
+
+EzhubCore.RegisterThread("SafetyMonitor", function(isAlive)
+	task.wait(0.25)
+	if not isAlive() then
+		return
+	end
+	local hum = getHumanoid()
+	if not hum or hum.MaxHealth <= 0 then
+		return
+	end
+	local ratio = hum.Health / hum.MaxHealth
+
+	if EzhubCore.Config.LowHpPauseEnabled and not EzhubCore.IsPausedByHP then
+		if ratio <= (EzhubCore.Config.LowHpThresholdRatio or 0.28) and hum.Health > 0 then
+			EzhubCore.IsPausedByHP = true
+			EzhubCore.SavedModesBeforeHP = snapshotRunningModes()
+			EzhubCore.AcquirePriority(EzhubCore.Priority.SAFETY_HP)
+			EzhubCore.Notify("Safety HP", string.format("Máu thấp (%.0f%%) — Tạm dừng an toàn để hồi phục.", ratio * 100))
+		end
+	elseif EzhubCore.IsPausedByHP then
+		if ratio >= (EzhubCore.Config.SafeHpResumeRatio or 0.75) then
+			EzhubCore.IsPausedByHP = false
+			EzhubCore.ReleasePriority(EzhubCore.Priority.SAFETY_HP)
+			if EzhubCore.Config.AutoResumeOnSafeHp then
+				restoreModesSnapshot(EzhubCore.SavedModesBeforeHP)
+				EzhubCore.Notify("Safety HP", string.format("Máu hồi phục (%.0f%%) — Tự động bật lại chế độ chạy.", ratio * 100))
+			else
+				EzhubCore.Notify("Safety HP", "Máu đã hồi phục an toàn (chờ bật lại thủ công).")
+			end
+			EzhubCore.SavedModesBeforeHP = {}
+		end
+	end
+end)
+
+-- Cơ chế Anti-Stuck: phát hiện đứng yên / kẹt bước lâu để thoát & thử lại
+EzhubCore.RegisterThread("AntiStuckMonitor", function(isAlive)
+	task.wait(1)
+	if not isAlive() or not EzhubCore.Config.AntiStuckEnabled then
+		return
+	end
+	local hasAnyActiveAction = EzhubCore.Config.AutoFarm
+		or EzhubCore.Config.AutoPatrolDragonIsland
+		or EzhubCore.Config.BeltQuestEnabled
+		or EzhubCore.Config.DragonStormQuestEnabled
+		or EzhubCore.Config.AutoInteractMission
+
+	if not hasAnyActiveAction or EzhubCore.IsPausedByHP then
+		return
+	end
+
+	local char = LocalPlayer.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not root or not hum then
+		return
+	end
+
+	local lastPos = root.Position
+	local stuckTimer = 0
+	local step = 0.5
+	local limit = EzhubCore.Config.StuckTimeoutSeconds or 8
+
+	while isAlive() and stuckTimer < limit do
+		task.wait(step)
+		stuckTimer += step
+		if not root.Parent then
+			break
+		end
+		if (root.Position - lastPos).Magnitude > 3.5 then
+			return -- Đã di chuyển bình thường
+		end
+	end
+
+	-- Phát hiện kẹt: thực hiện nhấp nháy vị trí / nhảy thoát & reset bước
+	EzhubCore.Notify("Anti-Stuck", "Phát hiện đứng yên/kẹt lâu — Đang thoát điểm kẹt và thử lại bước.")
+	pcall(function()
+		hum.Jump = true
+		local offset = CFrame.new(math.random(-12, 12), 18, math.random(-12, 12))
+		root.CFrame = root.CFrame * offset
+	end)
+	task.wait(0.4)
+end)
+
+-- Khởi tạo tự động nhớ cấu hình & lịch sử server
+EzhubCore.LoadConfig()
+EzhubCore.LoadVisitedServers()
+EzhubCore.MarkCurrentServerVisited()
+
+return EzhubCore
