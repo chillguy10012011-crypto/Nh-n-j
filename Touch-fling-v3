@@ -191,7 +191,7 @@ local tpStroke = Instance.new("UIStroke")
 tpStroke.Color = Color3.fromRGB(255, 50, 50)
 tpStroke.Thickness = 2
 tpStroke.Parent = tpBtn
--- Phần 2: Logic Xử lý (Fling Nâng Cấp, Velocity Prediction, Quét Vùng & Target TP)
+-- Phần 2: Logic Xử lý (Fling Nhấp Nhả & Target TP Kèm Fling Không Trả Vận Tốc)
 local isFlinging = false
 local flingConn = nil
 local isMinimized = false
@@ -210,12 +210,10 @@ local isTPRunning = false
 local tpThread = nil
 local savedCollideStates = {}
 
--- Thông số bù độ trễ mạng & quét va chạm (có thể tinh chỉnh theo ping / anti-fling)
-local PING_COMPENSATION = 0.16 -- Giây dự đoán hướng chạy (0.12 - 0.25s)
-local JITTER_RADIUS = 1.35    -- Bán kính quét bù sai số vị trí (studs)
+-- Thông số bù độ trễ & lực fling
+local PING_COMPENSATION = 0.16 -- Bù hướng chạy theo vận tốc mục tiêu (giây)
+local JITTER_RADIUS = 1.25    -- Quét nhẹ quanh điểm dự đoán khi bật Target TP (studs)
 local FLY_HOLD_TIME = 0.45    -- Thời gian bám ép liên tục trên mỗi mục tiêu ở Chế độ 2 (giây)
-local FLING_LINEAR_XY = 450000
-local FLING_LINEAR_Y = 260000
 
 local function getRoot(char)
 	if not char then return nil end
@@ -266,7 +264,7 @@ local function applyNoclip(char, enable)
 	end
 end
 
-local function getPredictedCFrame(targetRoot, dist, side)
+local function getPredictedCFrame(targetRoot, dist, side, t)
 	local vel = targetRoot.AssemblyLinearVelocity
 	local horizontalVel = Vector3.new(vel.X, 0, vel.Z)
 	local predictedPos = targetRoot.Position + (horizontalVel * PING_COMPENSATION)
@@ -285,19 +283,23 @@ local function getPredictedCFrame(targetRoot, dist, side)
 
 	local sideDir = (side == "Trước") and flatLook or -flatLook
 	local finalPos = predictedPos + (sideDir * dist)
+
+	-- Quét vi-dao động nhẹ quanh mục tiêu để bắt kịp độ trễ replication
+	local jx = math.sin(t * 47) * JITTER_RADIUS
+	local jy = math.cos(t * 39) * (JITTER_RADIUS * 0.6)
+	local jz = math.cos(t * 53) * JITTER_RADIUS
+	finalPos += Vector3.new(jx, jy, jz)
+
 	return CFrame.lookAt(finalPos, predictedPos)
 end
 
-local function applyJitterAndFling(root, t)
-	local jx = math.sin(t * 47) * JITTER_RADIUS
-	local jy = math.cos(t * 39) * (JITTER_RADIUS * 0.65)
-	local jz = math.cos(t * 53) * JITTER_RADIUS
-	root.CFrame = root.CFrame * CFrame.new(jx, jy, jz)
-
-	root.AssemblyAngularVelocity = Vector3.new(0, 9999, 0)
+-- Fling không trả lại vận tốc từng khung hình (dùng cho Target TP)
+local function applySustainedFling(root, t)
+	if not root then return end
 	local dirX = (math.sin(t * 31) >= 0) and 1 or -1
 	local dirZ = (math.cos(t * 29) >= 0) and 1 or -1
-	root.AssemblyLinearVelocity = Vector3.new(FLING_LINEAR_XY * dirX, FLING_LINEAR_Y, FLING_LINEAR_XY * dirZ)
+	root.AssemblyAngularVelocity = Vector3.new(0, 9999, 0)
+	root.AssemblyLinearVelocity = Vector3.new(450000 * dirX, 250000, 450000 * dirZ)
 end
 
 -- Cập nhật và vẽ lại danh sách người chơi trong ScrollingFrame
@@ -422,7 +424,7 @@ closeBtn.MouseButton1Click:Connect(function()
 	sc:Destroy()
 end)
 
--- Nút Bật/Tắt Fling chính
+-- Nút Bật/Tắt Fling chính (Nhấp nhả vận tốc cao & thấp từng khung hình như cũ)
 btn.MouseButton1Click:Connect(function()
 	isFlinging = not isFlinging
 	local char = plr.Character
@@ -440,12 +442,23 @@ btn.MouseButton1Click:Connect(function()
 		toggleNeonVisual(char, root, true)
 		applyNoclip(char, true)
 
-		local elapsed = 0
-		flingConn = RunService.Heartbeat:Connect(function(dt)
-			elapsed += dt
+		local busy = false
+		flingConn = RunService.Heartbeat:Connect(function()
+			if busy or not isFlinging then return end
+			busy = true
+
 			local currChar = plr.Character
 			local currRoot = getRoot(currChar)
-			if not currChar or not currRoot or not isFlinging then return end
+			if not currChar or not currRoot then
+				busy = false
+				return
+			end
+
+			-- Khi Target TP đang bật, nhường quyền điều khiển vận tốc cho Target TP
+			if isTPRunning then
+				busy = false
+				return
+			end
 
 			for _, part in ipairs(currChar:GetDescendants()) do
 				if part:IsA("BasePart") and part.CanCollide then
@@ -454,42 +467,41 @@ btn.MouseButton1Click:Connect(function()
 				end
 			end
 
-			local activeTarget = nil
-			if isTPRunning and currentMode == 1 and selectedMode1 and selectedMode1.Character then
-				activeTarget = getRoot(selectedMode1.Character)
+			local lastVel = currRoot.AssemblyLinearVelocity
+			currRoot.AssemblyLinearVelocity = Vector3.new(500000, 250000, 500000)
+			RunService.RenderStepped:Wait()
+			if currRoot and currRoot.Parent and isFlinging and not isTPRunning then
+				currRoot.AssemblyLinearVelocity = lastVel
 			end
 
-			if activeTarget then
-				local dist = tonumber(distBox.Text) or 2
-				currRoot.CFrame = getPredictedCFrame(activeTarget, dist, targetType)
-			end
-
-			applyJitterAndFling(currRoot, elapsed)
+			busy = false
 		end)
 	else
 		btn.Text = "Status: OFF"
 		btnStroke.Color = Color3.fromRGB(255, 50, 50)
 		if flingConn then flingConn:Disconnect(); flingConn = nil end
 		toggleNeonVisual(plr.Character, getRoot(plr.Character), false)
-		applyNoclip(plr.Character, false)
-		local currRoot = getRoot(plr.Character)
-		if currRoot then
-			currRoot.AssemblyAngularVelocity = Vector3.zero
-			currRoot.AssemblyLinearVelocity = Vector3.zero
+		if not isTPRunning then
+			applyNoclip(plr.Character, false)
 		end
 	end
 end)
 
--- Logic Xử lý Target Teleport
+-- Logic Xử lý Target Teleport (Gắn fling không trả vận tốc từng khung hình)
 tpBtn.MouseButton1Click:Connect(function()
 	isTPRunning = not isTPRunning
 	if isTPRunning then
 		tpBtn.Text = "Target TP: ON"
 		tpStroke.Color = Color3.fromRGB(0, 255, 100)
+		applyNoclip(plr.Character, true)
 
 		if tpThread then task.cancel(tpThread) end
 		tpThread = task.spawn(function()
+			local elapsed = 0
 			while isTPRunning do
+				local dt = RunService.Heartbeat:Wait()
+				elapsed += dt
+
 				local char = plr.Character
 				local root = getRoot(char)
 				local dist = tonumber(distBox.Text) or 2
@@ -500,10 +512,10 @@ tpBtn.MouseButton1Click:Connect(function()
 						if selectedMode1 and selectedMode1.Character then
 							local targetRoot = getRoot(selectedMode1.Character)
 							if targetRoot then
-								root.CFrame = getPredictedCFrame(targetRoot, dist, targetType)
+								root.CFrame = getPredictedCFrame(targetRoot, dist, targetType, elapsed)
+								applySustainedFling(root, elapsed)
 							end
 						end
-						RunService.Heartbeat:Wait()
 					else
 						local targetsToTP = {}
 						if listType == "White" then
@@ -523,31 +535,42 @@ tpBtn.MouseButton1Click:Connect(function()
 						if #targetsToTP > 0 then
 							for _, targetP in ipairs(targetsToTP) do
 								if not isTPRunning then break end
-								local holdUntil = os.clock() + (isFlinging and FLY_HOLD_TIME or 0.05)
+								local holdUntil = os.clock() + FLY_HOLD_TIME
 
 								while isTPRunning and os.clock() < holdUntil do
+									local stepDt = RunService.Heartbeat:Wait()
+									elapsed += stepDt
+
 									local currChar = plr.Character
 									local currRoot = getRoot(currChar)
 									local tRoot = targetP and targetP.Character and getRoot(targetP.Character)
 									if currChar and currRoot and tRoot then
-										currRoot.CFrame = getPredictedCFrame(tRoot, dist, targetType)
+										currRoot.CFrame = getPredictedCFrame(tRoot, dist, targetType, elapsed)
+										applySustainedFling(currRoot, elapsed)
 									else
 										break
 									end
-									RunService.Heartbeat:Wait()
 								end
 
-								local remainWait = cycleDelay - (isFlinging and FLY_HOLD_TIME or 0)
+								local remainWait = cycleDelay - FLY_HOLD_TIME
 								if remainWait > 0 and isTPRunning then
-									task.wait(remainWait)
+									local waitEnd = os.clock() + remainWait
+									while isTPRunning and os.clock() < waitEnd do
+										local stepDt = RunService.Heartbeat:Wait()
+										elapsed += stepDt
+										local currRoot = getRoot(plr.Character)
+										if currRoot then
+											applySustainedFling(currRoot, elapsed)
+										end
+									end
 								end
 							end
 						else
-							task.wait(0.4)
+							task.wait(0.3)
 						end
 					end
 				else
-					task.wait(0.4)
+					task.wait(0.3)
 				end
 			end
 		end)
@@ -555,6 +578,9 @@ tpBtn.MouseButton1Click:Connect(function()
 		tpBtn.Text = "Target TP: OFF"
 		tpStroke.Color = Color3.fromRGB(255, 50, 50)
 		if tpThread then task.cancel(tpThread); tpThread = nil end
+		if not isFlinging then
+			applyNoclip(plr.Character, false)
+		end
 	end
 end)
 
