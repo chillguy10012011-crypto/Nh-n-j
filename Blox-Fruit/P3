@@ -1,0 +1,410 @@
+-- [[ EZHUB V1 - PART 3/4: DRAGON ISLAND PATROL, MISSION INTERACT, CLEAR PATH, BELTS 1-8 & DRAGON STORM ]] --
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+local function attachDragonAndBeltModules(EzhubCore, Gameplay)
+	local DragonBelt = {}
+
+	-- Trạng thái vận hành nội bộ cho chuỗi Đai 1-8, Đảo Rồng & Dragon Storm
+	DragonBelt.CurrentBeltStage = 1
+	DragonBelt.DragonIslandFound = false
+	DragonBelt.DragonIslandPart = nil
+	DragonBelt.PatrolAngle = 0
+	DragonBelt.PatrolCenter = nil
+	DragonBelt.LastMissionStepText = ""
+
+	local function reportStepOnce(stepLabel)
+		if DragonBelt.LastMissionStepText ~= stepLabel then
+			DragonBelt.LastMissionStepText = stepLabel
+			EzhubCore.Notify("Mission", stepLabel)
+		end
+	end
+
+	-- Tìm Đảo Rồng hoặc khu vực liên quan trong Workspace
+	function DragonBelt.FindDragonIsland()
+		local candidates = {}
+		local keywords = {
+			"dragon island",
+			"dragon_island",
+			"dragonisland",
+			"prehistoric",
+			"dragon",
+		}
+
+		local function isDragonCandidate(inst)
+			local lower = string.lower(inst.Name)
+			for _, kw in ipairs(keywords) do
+				if string.find(lower, kw, 1, true) then
+					-- Loại trừ tool/vũ khí/mobs không phải đảo hoặc khu vực lớn
+					if inst:IsA("Model") or inst:IsA("Folder") or inst:IsA("BasePart") then
+						return true
+					end
+				end
+			end
+			return false
+		end
+
+		for _, child in ipairs(Workspace:GetChildren()) do
+			if isDragonCandidate(child) then
+				local anchor = child:IsA("BasePart")
+					and child
+					or (child:FindFirstChild("HumanoidRootPart") or child:FindFirstChildWhichIsA("BasePart", true))
+				if anchor then
+					table.insert(candidates, {
+						Model = child,
+						Part = anchor,
+						Position = anchor.Position,
+					})
+				end
+			end
+		end
+
+		local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if #candidates == 0 then
+			return nil
+		end
+
+		if not myRoot then
+			return candidates[1]
+		end
+
+		table.sort(candidates, function(a, b)
+			return (a.Position - myRoot.Position).Magnitude < (b.Position - myRoot.Position).Magnitude
+		end)
+		return candidates[1]
+	end
+
+	-- Dọn mục tiêu cản đường quanh vị trí hiện tại hoặc trên đảo
+	function DragonBelt.ClearBlockingTargets(maxRadius, isAlive)
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local enemies = Workspace:FindFirstChild("Enemies")
+		if not root or not enemies then
+			return false
+		end
+
+		local radius = maxRadius or 260
+		local clearedAny = false
+
+		while isAlive() and EzhubCore.CanRunFeature("ClearPathMobs", EzhubCore.Priority.MISSION_CORE) do
+			local nearestMob, nearestDist = nil, radius
+			for _, mob in ipairs(enemies:GetChildren()) do
+				local hum = mob:FindFirstChildOfClass("Humanoid")
+				local mRoot = mob:FindFirstChild("HumanoidRootPart")
+				if hum and mRoot and hum.Health > 0 then
+					local d = (root.Position - mRoot.Position).Magnitude
+					if d <= nearestDist then
+						nearestDist = d
+						nearestMob = mob
+					end
+				end
+			end
+
+			if not nearestMob then
+				break
+			end
+
+			clearedAny = true
+			reportStepOnce("Dọn mục tiêu cản đường: " .. nearestMob.Name)
+
+			local equippedTool = char:FindFirstChildOfClass("Tool")
+			if not equippedTool then
+				local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+				local tool = backpack and backpack:FindFirstChildOfClass("Tool")
+				if tool then
+					tool.Parent = char
+					equippedTool = tool
+				end
+			end
+
+			local mRoot = nearestMob:FindFirstChild("HumanoidRootPart")
+			local mHum = nearestMob:FindFirstChildOfClass("Humanoid")
+			while isAlive()
+				and EzhubCore.CanRunFeature("ClearPathMobs", EzhubCore.Priority.MISSION_CORE)
+				and mRoot.Parent
+				and mHum.Health > 0
+			do
+				if not root.Parent then
+					break
+				end
+				local hoverPos = mRoot.Position + Vector3.new(0, 12, 0)
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.CFrame = CFrame.lookAt(hoverPos, mRoot.Position)
+				if equippedTool and typeof(equippedTool.Activate) == "function" then
+					pcall(function()
+						equippedTool:Activate()
+					end)
+				end
+				task.wait(0.08)
+			end
+		end
+
+		return clearedAny
+	end
+
+	-- Tự động tương tác / nhận / cập nhật bước nhiệm vụ khi ở gần
+	function DragonBelt.InteractNearbyMissionPoints(maxDistance, isAlive)
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return false
+		end
+
+		local range = maxDistance or 45
+		local interacted = false
+
+		for _, desc in ipairs(Workspace:GetDescendants()) do
+			if not isAlive() or not EzhubCore.CanRunFeature("InteractMission", EzhubCore.Priority.MISSION_CORE) then
+				break
+			end
+
+			if desc:IsA("ProximityPrompt") and desc.Enabled then
+				local parentPart = desc.Parent and (desc.Parent:IsA("BasePart") and desc.Parent or desc.Parent:FindFirstChildWhichIsA("BasePart"))
+				if parentPart and (parentPart.Position - root.Position).Magnitude <= range then
+					pcall(function()
+						root.CFrame = CFrame.new(parentPart.Position + Vector3.new(0, 4, 3))
+						fireproximityprompt(desc)
+					end)
+					interacted = true
+					task.wait(0.25)
+				end
+			elseif desc:IsA("ClickDetector") and desc.Parent and desc.Parent:IsA("BasePart") then
+				if (desc.Parent.Position - root.Position).Magnitude <= range then
+					pcall(function()
+						root.CFrame = CFrame.new(desc.Parent.Position + Vector3.new(0, 4, 3))
+						fireclickdetector(desc)
+					end)
+					interacted = true
+					task.wait(0.25)
+				end
+			end
+		end
+
+		if interacted then
+			reportStepOnce("Đã tương tác/cập nhật điểm nhiệm vụ lân cận.")
+		end
+		return interacted
+	end
+
+	-- Cập nhật mốc Đai 1-8 hiện tại dựa trên túi đồ / nhân vật / cấu hình
+	function DragonBelt.ResolveBeltStage()
+		if tonumber(EzhubCore.Config.BeltTargetStage) then
+			local forced = math.clamp(math.floor(tonumber(EzhubCore.Config.BeltTargetStage)), 1, 8)
+			DragonBelt.CurrentBeltStage = forced
+			return forced
+		end
+
+		local detected = 1
+		local containers = {
+			LocalPlayer:FindFirstChild("Backpack"),
+			LocalPlayer.Character,
+		}
+		for _, bag in ipairs(containers) do
+			if bag then
+				for _, item in ipairs(bag:GetChildren()) do
+					local lower = string.lower(item.Name)
+					if string.find(lower, "belt", 1, true) or string.find(lower, "đai", 1, true) then
+						for stage = 8, 1, -1 do
+							if string.find(lower, tostring(stage), 1, true) then
+								detected = math.clamp(stage + 1, 1, 8)
+								break
+							end
+						end
+					end
+				end
+			end
+		end
+
+		DragonBelt.CurrentBeltStage = detected
+		return detected
+	end
+
+	-- =========================================================================
+	-- 1. LUỒNG TUẦN TRA VÒNG VÒNG SĂN ĐẢO RỒNG (AUTO PATROL DRAGON ISLAND)
+	-- =========================================================================
+	EzhubCore.RegisterThread("DragonIslandPatrolLoop", function(isAlive)
+		local wantsPatrol = EzhubCore.Config.AutoPatrolDragonIsland
+			or EzhubCore.Config.BeltQuestEnabled
+			or EzhubCore.Config.DragonStormQuestEnabled
+
+		if not wantsPatrol then
+			DragonBelt.DragonIslandFound = false
+			DragonBelt.DragonIslandPart = nil
+			task.wait(0.3)
+			return
+		end
+
+		if not EzhubCore.CanRunFeature("DragonPatrol", EzhubCore.Priority.MISSION_CORE) then
+			task.wait(0.3)
+			return
+		end
+
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not root or not hum or hum.Health <= 0 then
+			task.wait(0.3)
+			return
+		end
+
+		-- Quét tìm Đảo Rồng theo nhịp điều tiết mượt mà
+		local foundInfo = DragonBelt.FindDragonIsland()
+		if foundInfo and foundInfo.Position then
+			if not DragonBelt.DragonIslandFound then
+				DragonBelt.DragonIslandFound = true
+				DragonBelt.DragonIslandPart = foundInfo.Part
+				EzhubCore.Notify("Dragon Island", "Đã tìm thấy Đảo Rồng! Đang tiếp cận mục tiêu.")
+			end
+
+			Gameplay.MoveToPosition(foundInfo.Position + Vector3.new(0, 18, 0))
+
+			if EzhubCore.Config.AutoClearPathMobs then
+				DragonBelt.ClearBlockingTargets(280, isAlive)
+			end
+			if EzhubCore.Config.AutoInteractMission then
+				DragonBelt.InteractNearbyMissionPoints(55, isAlive)
+			end
+
+			task.wait(math.clamp(EzhubCore.Config.DragonScanInterval or 0.45, 0.2, 2.0))
+			return
+		end
+
+		DragonBelt.DragonIslandFound = false
+		DragonBelt.DragonIslandPart = nil
+
+		-- Chưa thấy Đảo Rồng: chạy tuần tra vòng vòng quanh tâm tuần tra
+		if not DragonBelt.PatrolCenter then
+			DragonBelt.PatrolCenter = Vector3.new(root.Position.X, math.max(root.Position.Y, 65), root.Position.Z)
+		end
+
+		local radius = 950
+		DragonBelt.PatrolAngle += 0.22
+		if DragonBelt.PatrolAngle > math.pi * 2 then
+			DragonBelt.PatrolAngle -= math.pi * 2
+		end
+
+		local nextWaypoint = Vector3.new(
+			DragonBelt.PatrolCenter.X + math.cos(DragonBelt.PatrolAngle) * radius,
+			DragonBelt.PatrolCenter.Y,
+			DragonBelt.PatrolCenter.Z + math.sin(DragonBelt.PatrolAngle) * radius
+		)
+
+		reportStepOnce(string.format("Tuần tra săn Đảo Rồng (góc %d°)", math.floor(math.deg(DragonBelt.PatrolAngle))))
+		Gameplay.MoveToPosition(nextWaypoint)
+
+		if EzhubCore.Config.AutoClearPathMobs then
+			DragonBelt.ClearBlockingTargets(140, isAlive)
+		end
+		if EzhubCore.Config.AutoInteractMission then
+			DragonBelt.InteractNearbyMissionPoints(40, isAlive)
+		end
+
+		task.wait(math.clamp(EzhubCore.Config.DragonScanInterval or 0.45, 0.2, 2.0))
+	end)
+
+	-- =========================================================================
+	-- 2. LUỒNG CHUỖI LẤY ĐAI 1-8 (BELT 1-8 PROGRESSION)
+	-- =========================================================================
+	EzhubCore.RegisterThread("BeltProgressionLoop", function(isAlive)
+		if not EzhubCore.Config.BeltQuestEnabled then
+			task.wait(0.35)
+			return
+		end
+		if not EzhubCore.CanRunFeature("BeltQuest", EzhubCore.Priority.MISSION_CORE) then
+			task.wait(0.35)
+			return
+		end
+
+		local stage = DragonBelt.ResolveBeltStage()
+		reportStepOnce(string.format("Đang xử lý chuỗi lấy Đai mốc %d / 8", stage))
+
+		if EzhubCore.Config.AutoClearPathMobs then
+			DragonBelt.ClearBlockingTargets(240, isAlive)
+		end
+
+		if EzhubCore.Config.AutoInteractMission then
+			DragonBelt.InteractNearbyMissionPoints(50, isAlive)
+		end
+
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commF = remotes and remotes:FindFirstChild("CommF_")
+		if commF then
+			pcall(function()
+				commF:InvokeServer("BeltQuest", "Advance", stage)
+				commF:InvokeServer("DojoTrainer", "ClaimBelt", stage)
+			end)
+		end
+
+		task.wait(0.85)
+	end)
+
+	-- =========================================================================
+	-- 3. LUỒNG LẤY DRAGON STORM
+	-- =========================================================================
+	EzhubCore.RegisterThread("DragonStormLoop", function(isAlive)
+		if not EzhubCore.Config.DragonStormQuestEnabled then
+			task.wait(0.35)
+			return
+		end
+		if not EzhubCore.CanRunFeature("DragonStorm", EzhubCore.Priority.MISSION_CORE) then
+			task.wait(0.35)
+			return
+		end
+
+		reportStepOnce("Đang thực hiện chuỗi nhiệm vụ lấy Dragon Storm")
+
+		if EzhubCore.Config.AutoClearPathMobs then
+			DragonBelt.ClearBlockingTargets(260, isAlive)
+		end
+
+		if EzhubCore.Config.AutoInteractMission then
+			DragonBelt.InteractNearbyMissionPoints(55, isAlive)
+		end
+
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commF = remotes and remotes:FindFirstChild("CommF_")
+		if commF then
+			pcall(function()
+				commF:InvokeServer("DragonStorm", "Progress")
+				commF:InvokeServer("DragonStorm", "Craft")
+			end)
+		end
+
+		task.wait(0.9)
+	end)
+
+	-- =========================================================================
+	-- 4. LUỒNG ĐỘC LẬP: TỰ TƯƠNG TÁC & DỌN CẢN ĐƯỜNG KHI BẬT RIÊNG LẺ
+	-- =========================================================================
+	EzhubCore.RegisterThread("StandaloneMissionAssistLoop", function(isAlive)
+		local standaloneMode = (EzhubCore.Config.AutoInteractMission or EzhubCore.Config.AutoClearPathMobs)
+			and not EzhubCore.Config.BeltQuestEnabled
+			and not EzhubCore.Config.DragonStormQuestEnabled
+			and not EzhubCore.Config.AutoPatrolDragonIsland
+
+		if not standaloneMode then
+			task.wait(0.35)
+			return
+		end
+		if not EzhubCore.CanRunFeature("StandaloneAssist", EzhubCore.Priority.MISSION_CORE) then
+			task.wait(0.35)
+			return
+		end
+
+		if EzhubCore.Config.AutoClearPathMobs then
+			DragonBelt.ClearBlockingTargets(220, isAlive)
+		end
+		if EzhubCore.Config.AutoInteractMission then
+			DragonBelt.InteractNearbyMissionPoints(45, isAlive)
+		end
+
+		task.wait(0.5)
+	end)
+
+	return DragonBelt
+end
+
+return attachDragonAndBeltModules
