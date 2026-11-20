@@ -1,0 +1,594 @@
+-- [[ EZHUB V1 - PART 2/4: AUTO FARM, STATS, LOOT/SHOP, TELEPORT & ESP ]] --
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+local function attachGameplayModules(EzhubCore)
+	local Gameplay = {}
+
+	-- Các mốc vị trí tham khảo theo từng Sea (có thể mở rộng thêm theo map thực tế)
+	Gameplay.SeaLocations = {
+		Sea1 = {
+			{ Name = "Middle Town", Kind = "Island", Position = Vector3.new(-655, 8, 1436) },
+			{ Name = "Jungle", Kind = "Island", Position = Vector3.new(-1612, 37, 146) },
+			{ Name = "Pirate Village", Kind = "Island", Position = Vector3.new(1122, 5, 4345) },
+			{ Name = "Marine Ford", Kind = "Island", Position = Vector3.new(-4810, 21, 4360) },
+			{ Name = "Prison", Kind = "Island", Position = Vector3.new(4854, 6, 738) },
+			{ Name = "Fountain City", Kind = "Island", Position = Vector3.new(5132, 4, 4037) },
+			{ Name = "Sea 2 Gate / Military Detective", Kind = "NPC/Gate", Position = Vector3.new(4850, 6, 800) },
+		},
+		Sea2 = {
+			{ Name = "Kingdom of Rose (Cafe)", Kind = "Island", Position = Vector3.new(-385, 73, 298) },
+			{ Name = "Green Zone", Kind = "Island", Position = Vector3.new(-2448, 73, -3210) },
+			{ Name = "Graveyard", Kind = "Island", Position = Vector3.new(-5411, 49, -740) },
+			{ Name = "Hot and Cold", Kind = "Island", Position = Vector3.new(-5823, 84, -5046) },
+			{ Name = "Cursed Ship", Kind = "Island", Position = Vector3.new(923, 125, 32853) },
+			{ Name = "Ice Castle", Kind = "Island", Position = Vector3.new(5426, 28, -6197) },
+			{ Name = "Sea 3 Gate / Don Swan Area", Kind = "NPC/Gate", Position = Vector3.new(2284, 15, 915) },
+		},
+		Sea3 = {
+			{ Name = "Port Town", Kind = "Island", Position = Vector3.new(-291, 44, 5580) },
+			{ Name = "Hydra Island", Kind = "Island", Position = Vector3.new(5228, 604, 345) },
+			{ Name = "Great Tree", Kind = "Island", Position = Vector3.new(2280, 25, -6430) },
+			{ Name = "Turtle Island", Kind = "Island", Position = Vector3.new(-13234, 332, -7625) },
+			{ Name = "Haunted Castle", Kind = "Island", Position = Vector3.new(-9505, 142, 5535) },
+			{ Name = "Tiki Outpost", Kind = "Island", Position = Vector3.new(-16220, 10, 442) },
+			{ Name = "Dragon Dojo / Prehistoric Zone", Kind = "NPC/Zone", Position = Vector3.new(5765, 1209, 801) },
+		},
+	}
+
+	function Gameplay.GetCurrentSea()
+		local placeId = game.PlaceId
+		if placeId == 2753915549 then
+			return "Sea1"
+		elseif placeId == 4442272183 then
+			return "Sea2"
+		elseif placeId == 7449423635 then
+			return "Sea3"
+		end
+		-- Fallback ước lượng theo tọa độ nhân vật nếu test ở place khác
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if root then
+			if root.Position.Y > 1000 or math.abs(root.Position.X) > 12000 then
+				return "Sea3"
+			elseif root.Position.Z > 15000 or math.abs(root.Position.X) > 5500 then
+				return "Sea2"
+			end
+		end
+		return "Sea1"
+	end
+
+	function Gameplay.GetSeaLocationsList()
+		local sea = Gameplay.GetCurrentSea()
+		return Gameplay.SeaLocations[sea] or Gameplay.SeaLocations.Sea1
+	end
+
+	function Gameplay.MoveToPosition(targetPos)
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not root or not hum or hum.Health <= 0 then
+			return false
+		end
+
+		local dist = (root.Position - targetPos).Magnitude
+		if dist <= 12 then
+			return true
+		end
+
+		-- Di chuyển mượt có kiểm soát để tránh văng vật lý đột ngột
+		local stepCount = math.clamp(math.ceil(dist / 55), 1, 25)
+		for i = 1, stepCount do
+			if EzhubCore.Config.EmergencyStopAll or EzhubCore.IsPausedByHP then
+				return false
+			end
+			if not root.Parent or hum.Health <= 0 then
+				return false
+			end
+			local alpha = i / stepCount
+			local nextPos = root.Position:Lerp(targetPos, alpha) + Vector3.new(0, 6, 0)
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.CFrame = CFrame.lookAt(nextPos, Vector3.new(targetPos.X, nextPos.Y, targetPos.Z))
+			task.wait(0.05)
+		end
+
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
+		return true
+	end
+
+	function Gameplay.SaveCurrentPosition()
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not root then
+			EzhubCore.Notify("Teleport", "Không tìm thấy vị trí nhân vật hiện tại.")
+			return false
+		end
+		EzhubCore.Config.SavedPosition = {
+			x = root.Position.X,
+			y = root.Position.Y,
+			z = root.Position.Z,
+		}
+		EzhubCore.SaveConfig()
+		EzhubCore.Notify("Teleport", string.format("Đã lưu vị trí (%.0f, %.0f, %.0f).", root.Position.X, root.Position.Y, root.Position.Z))
+		return true
+	end
+
+	function Gameplay.TeleportToSavedPosition()
+		local pos = EzhubCore.Config.SavedPosition
+		if type(pos) ~= "table" or not pos.x then
+			EzhubCore.Notify("Teleport", "Chưa có vị trí nào được lưu.")
+			return false
+		end
+		local ok = Gameplay.MoveToPosition(Vector3.new(pos.x, pos.y, pos.z))
+		if ok then
+			EzhubCore.Notify("Teleport", "Đã dịch chuyển về vị trí đã lưu.")
+		end
+		return ok
+	end
+
+	function Gameplay.TeleportToSelectedTarget()
+		local list = Gameplay.GetSeaLocationsList()
+		local chosen = EzhubCore.Config.SelectedSeaTarget
+		for _, item in ipairs(list) do
+			if item.Name == chosen then
+				local ok = Gameplay.MoveToPosition(item.Position)
+				if ok then
+					EzhubCore.Notify("Teleport", "Đã tới: " .. item.Name)
+				end
+				return ok
+			end
+		end
+		if list[1] then
+			return Gameplay.MoveToPosition(list[1].Position)
+		end
+		return false
+	end
+
+	function Gameplay.TravelToNextSeaIfEligible()
+		local sea = Gameplay.GetCurrentSea()
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commF = remotes and remotes:FindFirstChild("CommF_")
+		if sea == "Sea1" then
+			EzhubCore.Notify("Sea Travel", "Đang kiểm tra điều kiện qua Sea 2...")
+			if commF then
+				pcall(function()
+					commF:InvokeServer("TravelDressrosa")
+				end)
+			end
+		elseif sea == "Sea2" then
+			EzhubCore.Notify("Sea Travel", "Đang kiểm tra điều kiện qua Sea 3...")
+			if commF then
+				pcall(function()
+					commF:InvokeServer("TravelZou")
+				end)
+			end
+		else
+			EzhubCore.Notify("Sea Travel", "Bạn đang ở Sea 3 (Sea cao nhất).")
+		end
+	end
+
+	-- Tìm mục tiêu Mob / Boss gần nhất
+	local function findNearestEnemy(targetType)
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return nil
+		end
+
+		local enemiesFolder = Workspace:FindFirstChild("Enemies")
+		if not enemiesFolder then
+			return nil
+		end
+
+		local bestModel, bestDist = nil, math.huge
+		for _, mob in ipairs(enemiesFolder:GetChildren()) do
+			local hum = mob:FindFirstChildOfClass("Humanoid")
+			local mRoot = mob:FindFirstChild("HumanoidRootPart")
+			if hum and mRoot and hum.Health > 0 then
+				local isBoss = string.find(string.lower(mob.Name), "boss") ~= nil
+					or string.find(string.lower(mob.Name), "king") ~= nil
+					or string.find(string.lower(mob.Name), "rip_indra") ~= nil
+					or string.find(string.lower(mob.Name), "dough") ~= nil
+				local matchesMode = (targetType == "Boss" and isBoss) or (targetType ~= "Boss")
+				if matchesMode then
+					local d = (root.Position - mRoot.Position).Magnitude
+					if d < bestDist then
+						bestDist = d
+						bestModel = mob
+					end
+				end
+			end
+		end
+		return bestModel
+	end
+
+	local function equipAndAttackTarget(enemyModel)
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local eRoot = enemyModel and enemyModel:FindFirstChild("HumanoidRootPart")
+		local eHum = enemyModel and enemyModel:FindFirstChildOfClass("Humanoid")
+		if not root or not eRoot or not eHum or eHum.Health <= 0 then
+			return
+		end
+
+		-- Trang bị vũ khí/tool đầu tiên nếu chưa cầm tool
+		local equippedTool = char:FindFirstChildOfClass("Tool")
+		if not equippedTool then
+			local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+			local candidate = backpack and backpack:FindFirstChildOfClass("Tool")
+			if candidate then
+				candidate.Parent = char
+				equippedTool = candidate
+			end
+		end
+
+		local attackPos = eRoot.Position + Vector3.new(0, 12, 0)
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.CFrame = CFrame.lookAt(attackPos, eRoot.Position)
+
+		if equippedTool and typeof(equippedTool.Activate) == "function" then
+			pcall(function()
+				equippedTool:Activate()
+			end)
+		end
+	end
+
+	-- Luồng Auto Farm (Ưu tiên nhiệm vụ / tác vụ chính)
+	EzhubCore.RegisterThread("AutoFarmLoop", function(isAlive)
+		if not EzhubCore.Config.AutoFarm then
+			task.wait(0.25)
+			return
+		end
+		if not EzhubCore.CanRunFeature("AutoFarm", EzhubCore.Priority.MISSION_CORE) then
+			task.wait(0.25)
+			return
+		end
+		-- Nhường nếu chuỗi Đai / Đảo Rồng / Dragon Storm đang giữ ưu tiên
+		if EzhubCore.Config.BeltQuestEnabled or EzhubCore.Config.AutoPatrolDragonIsland or EzhubCore.Config.DragonStormQuestEnabled then
+			task.wait(0.25)
+			return
+		end
+
+		local target = findNearestEnemy(EzhubCore.Config.AutoFarmTargetType)
+		if target then
+			equipAndAttackTarget(target)
+		end
+		task.wait(0.08)
+	end)
+
+	-- Luồng Auto Stats (Chọn nhánh + Slider số điểm nâng mỗi lần)
+	EzhubCore.RegisterThread("AutoStatsLoop", function(isAlive)
+		if not EzhubCore.Config.AutoStats then
+			task.wait(0.4)
+			return
+		end
+		if not EzhubCore.CanRunFeature("AutoStats", EzhubCore.Priority.SECONDARY) then
+			task.wait(0.4)
+			return
+		end
+
+		local branchMap = {
+			Melee = "Melee",
+			Defense = "Defense",
+			Sword = "Sword",
+			Gun = "Gun",
+			Fruit = "Demon Fruit",
+		}
+		local statArg = branchMap[EzhubCore.Config.StatBranch] or "Melee"
+		local points = math.clamp(math.floor(EzhubCore.Config.StatPointsPerStep or 1), 1, 250)
+
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commF = remotes and remotes:FindFirstChild("CommF_")
+		if commF then
+			pcall(function()
+				commF:InvokeServer("AddPoint", statArg, points)
+			end)
+		end
+		task.wait(0.35)
+	end)
+
+	-- Luồng nhặt item, mua vật phẩm cơ bản & tự động mua Trái Ác Quỷ
+	EzhubCore.RegisterThread("AutoLootAndShopLoop", function(isAlive)
+		if not (EzhubCore.Config.AutoLoot or EzhubCore.Config.AutoBuyBasicItems or EzhubCore.Config.AutoBuyFruit) then
+			task.wait(0.4)
+			return
+		end
+		if not EzhubCore.CanRunFeature("AutoLootAndShop", EzhubCore.Priority.SECONDARY) then
+			task.wait(0.4)
+			return
+		end
+
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+
+		-- 1. Tự nhặt item / chest / fruit rơi quanh khu vực
+		if EzhubCore.Config.AutoLoot and root then
+			for _, obj in ipairs(Workspace:GetDescendants()) do
+				if not isAlive() then
+					break
+				end
+				if obj:IsA("TouchTransmitter") and obj.Parent and obj.Parent:IsA("BasePart") then
+					local part = obj.Parent
+					if (part.Position - root.Position).Magnitude <= 140 then
+						pcall(function()
+							part.CFrame = root.CFrame
+						end)
+					end
+				elseif obj:IsA("Tool") and obj:FindFirstChild("Handle") then
+					local handle = obj.Handle
+					if (handle.Position - root.Position).Magnitude <= 140 then
+						pcall(function()
+							handle.CFrame = root.CFrame
+						end)
+					end
+				end
+			end
+		end
+
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commF = remotes and remotes:FindFirstChild("CommF_")
+
+		-- 2. Mua vật phẩm cơ bản (VD: Random Surprise / basic supplies nếu game hỗ trợ)
+		if EzhubCore.Config.AutoBuyBasicItems and commF then
+			pcall(function()
+				commF:InvokeServer("BuyItem", "BasicSupply")
+			end)
+		end
+
+		-- 3. Tự động mua Trái Ác Quỷ (Dealer / Random Fruit)
+		if EzhubCore.Config.AutoBuyFruit and commF then
+			pcall(function()
+				commF:InvokeServer("Cousinen", "Buy")
+				commF:InvokeServer("GetFruit", true)
+			end)
+		end
+
+		task.wait(1.2)
+	end)
+
+	-- =========================================================================
+	-- HỆ THỐNG ESP / VISUAL (PLAYER, BOSS/MOB, FRUIT/CHEST/ISLAND)
+	-- Có tự động làm mới khi Player Join game hoặc Respawn
+	-- =========================================================================
+	local EspFolder = Instance.new("Folder")
+	EspFolder.Name = "EzhubV1_ESP_Folder"
+	EspFolder.Parent = game:GetService("CoreGui")
+
+	local PlayerEspObjects = {}
+	local PlayerConnections = {}
+	local GenericEspObjects = {}
+
+	local function clearTableVisuals(tbl)
+		for key, gui in pairs(tbl) do
+			if typeof(gui) == "Instance" then
+				pcall(function()
+					gui:Destroy()
+				end)
+			end
+			tbl[key] = nil
+		end
+	end
+
+	local function createEspTag(adorneePart, titleText, accentColor)
+		if not adorneePart or not adorneePart:IsA("BasePart") then
+			return nil
+		end
+		local bb = Instance.new("BillboardGui")
+		bb.Name = "EzhubEspTag"
+		bb.Adornee = adorneePart
+		bb.AlwaysOnTop = true
+		bb.Size = UDim2.fromOffset(170, 38)
+		bb.StudsOffset = Vector3.new(0, 3.2, 0)
+		bb.Parent = EspFolder
+
+		local frame = Instance.new("Frame")
+		frame.Size = UDim2.fromScale(1, 1)
+		frame.BackgroundColor3 = Color3.fromRGB(14, 18, 28)
+		frame.BackgroundTransparency = 0.25
+		frame.BorderSizePixel = 0
+		frame.Parent = bb
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = frame
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = accentColor
+		stroke.Thickness = 1.3
+		stroke.Parent = frame
+
+		local label = Instance.new("TextLabel")
+		label.Name = "InfoLabel"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.TextColor3 = Color3.fromRGB(240, 248, 255)
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 11
+		label.TextWrapped = true
+		label.Text = titleText
+		label.Parent = frame
+
+		return bb
+	end
+
+	local function removePlayerEsp(playerObj)
+		if PlayerEspObjects[playerObj] then
+			pcall(function()
+				PlayerEspObjects[playerObj]:Destroy()
+			end)
+			PlayerEspObjects[playerObj] = nil
+		end
+	end
+
+	-- Làm mới hoặc tạo lại ESP cho một người chơi (gọi khi Join game hoặc Respawn)
+	local function refreshPlayerEsp(playerObj)
+		removePlayerEsp(playerObj)
+		if playerObj == LocalPlayer or not EzhubCore.Config.EspPlayer or EzhubCore.Config.EmergencyStopAll then
+			return
+		end
+		local char = playerObj.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not root or not hum or hum.Health <= 0 then
+			return
+		end
+
+		local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		local dist = myRoot and math.floor((myRoot.Position - root.Position).Magnitude) or 0
+		local hpPct = hum.MaxHealth > 0 and math.floor((hum.Health / hum.MaxHealth) * 100) or 0
+		local text = string.format("[P] %s | %d%% HP | %dm", playerObj.DisplayName, hpPct, dist)
+
+		local tag = createEspTag(root, text, Color3.fromRGB(0, 225, 255))
+		if tag then
+			PlayerEspObjects[playerObj] = tag
+		end
+	end
+
+	local function hookPlayerLifecycle(playerObj)
+		if playerObj == LocalPlayer or PlayerConnections[playerObj] then
+			return
+		end
+		local conns = {}
+		table.insert(conns, playerObj.CharacterAdded:Connect(function(newChar)
+			if EzhubCore.Config.EspPlayer and EzhubCore.Config.EspRefreshOnRespawnJoin then
+				task.wait(0.25)
+				local root = newChar:WaitForChild("HumanoidRootPart", 5)
+				if root then
+					refreshPlayerEsp(playerObj)
+				end
+			end
+		end))
+		table.insert(conns, playerObj.CharacterRemoving:Connect(function()
+			removePlayerEsp(playerObj)
+		end))
+		PlayerConnections[playerObj] = conns
+	end
+
+	-- Đăng ký tự động bắt sự kiện Player Join & Leave ngay từ đầu
+	Players.PlayerAdded:Connect(function(plr)
+		hookPlayerLifecycle(plr)
+		if EzhubCore.Config.EspPlayer and EzhubCore.Config.EspRefreshOnRespawnJoin then
+			task.wait(0.3)
+			refreshPlayerEsp(plr)
+		end
+	end)
+
+	Players.PlayerRemoving:Connect(function(plr)
+		removePlayerEsp(plr)
+		if PlayerConnections[plr] then
+			for _, conn in ipairs(PlayerConnections[plr]) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			PlayerConnections[plr] = nil
+		end
+	end)
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		hookPlayerLifecycle(plr)
+	end
+
+	local function cleanupAllEsp()
+		for plr, _ in pairs(PlayerEspObjects) do
+			removePlayerEsp(plr)
+		end
+		clearTableVisuals(GenericEspObjects)
+	end
+
+	-- Luồng ESP có điều tiết nhịp quét & tự ngắt sạch sẽ khi tắt nút
+	EzhubCore.RegisterThread("EspVisualLoop", function(isAlive)
+		local anyEspOn = not EzhubCore.Config.EmergencyStopAll
+			and (EzhubCore.Config.EspPlayer or EzhubCore.Config.EspMobBoss or EzhubCore.Config.EspLootIsland)
+
+		if not anyEspOn then
+			cleanupAllEsp()
+			task.wait(0.35)
+			return
+		end
+
+		local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+		-- 1. ESP Player (có làm mới khi Respawn / Join game)
+		if EzhubCore.Config.EspPlayer then
+			for _, plr in ipairs(Players:GetPlayers()) do
+				if not isAlive() or not EzhubCore.Config.EspPlayer then
+					break
+				end
+				refreshPlayerEsp(plr)
+			end
+		else
+			for plr, _ in pairs(PlayerEspObjects) do
+				removePlayerEsp(plr)
+			end
+		end
+
+		-- 2. ESP Boss / Mob & Fruit / Chest / Island
+		clearTableVisuals(GenericEspObjects)
+		if myRoot then
+			if EzhubCore.Config.EspMobBoss then
+				local enemies = Workspace:FindFirstChild("Enemies")
+				if enemies then
+					for idx, mob in ipairs(enemies:GetChildren()) do
+						if idx > 35 then
+							break
+						end
+						local mRoot = mob:FindFirstChild("HumanoidRootPart")
+						local mHum = mob:FindFirstChildOfClass("Humanoid")
+						if mRoot and mHum and mHum.Health > 0 then
+							local dist = math.floor((myRoot.Position - mRoot.Position).Magnitude)
+							local isBoss = string.find(string.lower(mob.Name), "boss") ~= nil
+							local tag = createEspTag(
+								mRoot,
+								string.format("[%s] %s (%dm)", isBoss and "BOSS" or "MOB", mob.Name, dist),
+								isBoss and Color3.fromRGB(255, 75, 110) or Color3.fromRGB(255, 195, 50)
+							)
+							if tag then
+								GenericEspObjects["mob_" .. tostring(idx)] = tag
+							end
+						end
+					end
+				end
+			end
+
+			if EzhubCore.Config.EspLootIsland then
+				-- Quét Fruit / Chest / Đảo Rồng
+				for idx, item in ipairs(Workspace:GetChildren()) do
+					if idx > 40 then
+						break
+					end
+					if string.find(string.lower(item.Name), "fruit") then
+						local handle = item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart")
+						if handle then
+							local dist = math.floor((myRoot.Position - handle.Position).Magnitude)
+							local tag = createEspTag(handle, string.format("[FRUIT] %s (%dm)", item.Name, dist), Color3.fromRGB(70, 255, 155))
+							if tag then
+								GenericEspObjects["fruit_" .. tostring(idx)] = tag
+							end
+						end
+					elseif string.find(string.lower(item.Name), "dragon") or string.find(string.lower(item.Name), "island") then
+						local part = item:FindFirstChildWhichIsA("BasePart") or (item:IsA("BasePart") and item or nil)
+						if part then
+							local dist = math.floor((myRoot.Position - part.Position).Magnitude)
+							local tag = createEspTag(part, string.format("[ISLAND] %s (%dm)", item.Name, dist), Color3.fromRGB(165, 110, 255))
+							if tag then
+								GenericEspObjects["isl_" .. tostring(idx)] = tag
+							end
+						end
+					end
+				end
+			end
+		end
+
+		local interval = math.clamp(EzhubCore.Config.EspScanInterval or 0.35, 0.15, 2.0)
+		task.wait(interval)
+	end)
+
+	return Gameplay
+end
+
+return attachGameplayModules
