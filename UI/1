@@ -1,0 +1,247 @@
+-- MiniNeonUI.lua (Upload lên GitHub lấy link Raw)
+local Library = {}
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Hàm bảo vệ GUI trên Executor (tránh bị game phát hiện)
+local function ProtectGui(gui)
+    if syn and syn.protect_gui then
+        syn.protect_gui(gui)
+        gui.Parent = CoreGui
+    elseif gethui then
+        gui.Parent = gethui()
+    else
+        gui.Parent = CoreGui
+    end
+end
+
+-- Hàm hỗ trợ kéo thả mượt cho cả Chuột & Cảm ứng Mobile
+local function MakeDraggable(dragPart, mainFrame)
+    local dragging, dragInput, dragStart, startPos
+    dragPart.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    dragPart.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Khởi tạo Cửa sổ chính
+function Library:CreateWindow(titleText, accentColor)
+    accentColor = accentColor or Color3.fromRGB(0, 255, 170) -- Mặc định Cyan/Green Neon
+
+    -- Xóa UI cũ nếu chạy lại script
+    local oldGui = (gethui and gethui():FindFirstChild("MiniNeonHub")) or CoreGui:FindFirstChild("MiniNeonHub")
+    if oldGui then oldGui:Destroy() end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "MiniNeonHub"
+    ScreenGui.ResetOnSpawn = false
+    ProtectGui(ScreenGui)
+
+    -- Khung chính (Gọn nhẹ, không che màn hình điện thoại)
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 230, 0, 280)
+    MainFrame.Position = UDim2.new(0.5, -115, 0.5, -140)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = ScreenGui
+
+    local MainCorner = Instance.new("UICorner", MainFrame)
+    MainCorner.CornerRadius = UDim.new(0, 8)
+
+    local MainStroke = Instance.new("UIStroke", MainFrame)
+    MainStroke.Color = accentColor
+    MainStroke.Thickness = 1.5
+
+    -- Thanh tiêu đề (TopBar)
+    local TopBar = Instance.new("Frame")
+    TopBar.Size = UDim2.new(1, 0, 0, 32)
+    TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    TopBar.BorderSizePixel = 0
+    TopBar.Parent = MainFrame
+
+    local TopCorner = Instance.new("UICorner", TopBar)
+    TopCorner.CornerRadius = UDim.new(0, 8)
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, -65, 1, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = titleText or "MINI HUB"
+    Title.TextColor3 = accentColor
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 13
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TopBar
+
+    -- Nút Thu Nhỏ (-)
+    local MinBtn = Instance.new("TextButton")
+    MinBtn.Size = UDim2.new(0, 24, 0, 24)
+    MinBtn.Position = UDim2.new(1, -54, 0, 4)
+    MinBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    MinBtn.Text = "-"
+    MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinBtn.Font = Enum.Font.GothamBold
+    MinBtn.TextSize = 14
+    MinBtn.Parent = TopBar
+    Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
+
+    -- Nút Đóng (X)
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+    CloseBtn.Position = UDim2.new(1, -28, 0, 4)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 55)
+    CloseBtn.Text = "X"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 12
+    CloseBtn.Parent = TopBar
+    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+    -- Khu vực chứa các nút (Tự động cuộn khi nhiều nút)
+    local Container = Instance.new("ScrollingFrame")
+    Container.Size = UDim2.new(1, -12, 1, -40)
+    Container.Position = UDim2.new(0, 6, 0, 36)
+    Container.BackgroundTransparency = 1
+    Container.ScrollBarThickness = 2
+    Container.ScrollBarImageColor3 = accentColor
+    Container.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    Container.Parent = MainFrame
+
+    local ListLayout = Instance.new("UIListLayout", Container)
+    ListLayout.Padding = UDim.new(0, 6)
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- Logic Thu nhỏ / Đóng / Kéo thả
+    MakeDraggable(TopBar, MainFrame)
+
+    local minimized = false
+    MinBtn.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        MinBtn.Text = minimized and "+" or "-"
+        TweenService:Create(MainFrame, TweenInfo.new(0.2), {
+            Size = minimized and UDim2.new(0, 230, 0, 32) or UDim2.new(0, 230, 0, 280)
+        }):Play()
+    end)
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+
+    -- Các hàm gắn thành phần vào Window
+    local Elements = {}
+
+    -- 1. Thêm Nút Bấm (Button)
+    function Elements:AddButton(text, callback)
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.new(1, -4, 0, 32)
+        Btn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+        Btn.Text = text
+        Btn.TextColor3 = Color3.fromRGB(235, 235, 235)
+        Btn.Font = Enum.Font.GothamSemibold
+        Btn.TextSize = 12
+        Btn.Parent = Container
+
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+        local stroke = Instance.new("UIStroke", Btn)
+        stroke.Color = Color3.fromRGB(50, 50, 60)
+        stroke.Thickness = 1
+
+        Btn.MouseButton1Click:Connect(function()
+            -- Hiệu ứng nháy nhẹ khi bấm
+            TweenService:Create(Btn, TweenInfo.new(0.1), {BackgroundColor3 = accentColor, TextColor3 = Color3.fromRGB(15, 15, 18)}):Play()
+            task.wait(0.12)
+            TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(28, 28, 35), TextColor3 = Color3.fromRGB(235, 235, 235)}):Play()
+            if callback then task.spawn(callback) end
+        end)
+    end
+
+    -- 2. Thêm Công Tắc Bật/Tắt (Toggle)
+    function Elements:AddToggle(text, default, callback)
+        local state = default or false
+
+        local ToggleBtn = Instance.new("TextButton")
+        ToggleBtn.Size = UDim2.new(1, -4, 0, 32)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+        ToggleBtn.Text = "  " .. text
+        ToggleBtn.TextColor3 = Color3.fromRGB(235, 235, 235)
+        ToggleBtn.Font = Enum.Font.GothamSemibold
+        ToggleBtn.TextSize = 12
+        ToggleBtn.TextXAlignment = Enum.TextXAlignment.Left
+        ToggleBtn.Parent = Container
+        Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+
+        local StatusBox = Instance.new("Frame")
+        StatusBox.Size = UDim2.new(0, 34, 0, 18)
+        StatusBox.Position = UDim2.new(1, -42, 0.5, -9)
+        StatusBox.BackgroundColor3 = state and accentColor or Color3.fromRGB(55, 55, 65)
+        StatusBox.Parent = ToggleBtn
+        Instance.new("UICorner", StatusBox).CornerRadius = UDim.new(1, 0)
+
+        local Dot = Instance.new("Frame")
+        Dot.Size = UDim2.new(0, 14, 0, 14)
+        Dot.Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+        Dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        Dot.Parent = StatusBox
+        Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+
+        local function UpdateVisual()
+            TweenService:Create(StatusBox, TweenInfo.new(0.15), {
+                BackgroundColor3 = state and accentColor or Color3.fromRGB(55, 55, 65)
+            }):Play()
+            TweenService:Create(Dot, TweenInfo.new(0.15), {
+                Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+            }):Play()
+        end
+
+        ToggleBtn.MouseButton1Click:Connect(function()
+            state = not state
+            UpdateVisual()
+            if callback then task.spawn(callback, state) end
+        end)
+
+        if state and callback then task.spawn(callback, true) end
+    end
+
+    -- 3. Thêm Dòng Chữ Phân Loại (Label)
+    function Elements:AddLabel(text)
+        local Lbl = Instance.new("TextLabel")
+        Lbl.Size = UDim2.new(1, -4, 0, 22)
+        Lbl.BackgroundTransparency = 1
+        Lbl.Text = "--- " .. text .. " ---"
+        Lbl.TextColor3 = Color3.fromRGB(150, 150, 165)
+        Lbl.Font = Enum.Font.Gotham
+        Lbl.TextSize = 11
+        Lbl.Parent = Container
+        return Lbl
+    end
+
+    return Elements
+end
+
+return Library
