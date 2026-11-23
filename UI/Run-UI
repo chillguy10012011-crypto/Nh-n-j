@@ -1,0 +1,21 @@
+-- Gọi UI mẫu từ GitHub
+local UI = loadstring(game:HttpGet("LINK_RAW_GITHUB_CUA_BAN"))()
+
+-- Tạo cửa sổ (Tên Hub, Màu viền Neon)
+local Window = UI:CreateWindow("MY HUB V1", Color3.fromRGB(0, 255, 170))
+
+-- Gắn chữ phân loại
+Window:AddLabel("Chức năng chính")
+
+-- Gắn nút bấm 1 lần
+Window:AddButton("Reset Nhân Vật", function()
+    game.Players.LocalPlayer.Character:BreakJoints()
+end)
+
+-- Gắn công tắc Bật/Tắt
+Window:AddToggle("Tăng Tốc (Speed 50)", false, function(isOn)
+    local hum = game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = isOn and 50 or 16
+    end
+end)
