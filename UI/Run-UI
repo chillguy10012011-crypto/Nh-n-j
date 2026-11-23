@@ -1,5 +1,5 @@
 -- Gọi UI mẫu từ GitHub
-local UI = loadstring(game:HttpGet("LINK_RAW_GITHUB_CUA_BAN"))()
+local UI = loadstring(game:HttpGet("https://raw.githubusercontent.com/chillguy10012011-crypto/Nh-n-j/refs/heads/main/UI/1"))()
 
 -- Tạo cửa sổ (Tên Hub, Màu viền Neon)
 local Window = UI:CreateWindow("MY HUB V1", Color3.fromRGB(0, 255, 170))
